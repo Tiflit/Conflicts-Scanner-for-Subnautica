@@ -15,10 +15,12 @@ namespace ConflictScanner.Profiles
 
         public override void RegisterAnalyzers(AnalyzerPipeline pipeline)
         {
+            pipeline.Add(new SMLHelperAnalyzer());
             pipeline.Add(new HarmonyAnalyzer());
             pipeline.Add(new NautilusAnalyzer());
             pipeline.Add(new QModAnalyzer());
             pipeline.Add(new FileOverrideAnalyzer());
+            pipeline.Add(new PatcherAnalyzer());
 
             // Deep Scan reflection analyzers
             pipeline.Add(new NautilusReflectionAnalyzer());
