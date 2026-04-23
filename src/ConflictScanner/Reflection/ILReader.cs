@@ -7,6 +7,7 @@ namespace ConflictScanner.Reflection
 {
     /// <summary>
     /// Minimal IL reader to extract constant string arguments from method calls.
+    /// Assumes simple patterns: ldstr followed by call/callvirt.
     /// </summary>
     public static class ILReader
     {
@@ -19,25 +20,54 @@ namespace ConflictScanner.Reflection
             var il = body.GetILAsByteArray();
             var module = method.Module;
 
-            int i = 0;
-            while (i < il.Length)
-            {
-                OpCode op = ReadOpCode(il, ref i);
+            int index = 0;
+            string lastString = null;
 
-                if (op == OpCodes.Call || op == OpCodes.Callvirt)
+            while (index < il.Length)
+            {
+                OpCode op = ReadOpCode(il, ref index);
+
+                if (op == OpCodes.Ldstr)
                 {
-                    int token = ReadInt32(il, ref i);
-                    var target = module.ResolveMethod(token) as MethodInfo;
+                    int token = ReadInt32(il, ref index);
+                    try
+                    {
+                        lastString = module.ResolveString(token);
+                    }
+                    catch
+                    {
+                        lastString = null;
+                    }
+                }
+                else if (op == OpCodes.Call || op == OpCodes.Callvirt)
+                {
+                    int token = ReadInt32(il, ref index);
+                    MethodInfo target = null;
+
+                    try
+                    {
+                        target = module.ResolveMethod(token) as MethodInfo;
+                    }
+                    catch
+                    {
+                        target = null;
+                    }
 
                     if (target != null)
                     {
-                        var args = ExtractArguments(il, ref i);
+                        var args = new List<object>();
+                        if (lastString != null)
+                        {
+                            args.Add(lastString);
+                            lastString = null;
+                        }
+
                         yield return (target, args);
                     }
                 }
                 else
                 {
-                    SkipOperand(op, il, ref i);
+                    SkipOperand(op, il, ref index);
                 }
             }
         }
@@ -45,6 +75,7 @@ namespace ConflictScanner.Reflection
         private static OpCode ReadOpCode(byte[] il, ref int index)
         {
             byte code = il[index++];
+
             if (code != 0xFE)
                 return singleByteOpCodes[code];
 
@@ -65,17 +96,19 @@ namespace ConflictScanner.Reflection
             {
                 case OperandType.InlineNone:
                     return;
+
                 case OperandType.ShortInlineBrTarget:
                 case OperandType.ShortInlineI:
                 case OperandType.ShortInlineVar:
                     index += 1;
                     return;
+
                 case OperandType.InlineVar:
                     index += 2;
                     return;
+
                 case OperandType.InlineI:
                 case OperandType.InlineBrTarget:
-                case OperandType.InlineR:
                 case OperandType.InlineField:
                 case OperandType.InlineMethod:
                 case OperandType.InlineSig:
@@ -84,32 +117,20 @@ namespace ConflictScanner.Reflection
                 case OperandType.InlineType:
                     index += 4;
                     return;
+
                 case OperandType.InlineI8:
                 case OperandType.InlineR8:
                     index += 8;
                     return;
+
                 case OperandType.InlineSwitch:
                     int count = BitConverter.ToInt32(il, index);
                     index += 4 + (count * 4);
                     return;
+
+                default:
+                    return;
             }
-        }
-
-        private static List<object> ExtractArguments(byte[] il, ref int index)
-        {
-            // This is intentionally simple: we only extract constant strings.
-            var args = new List<object>();
-
-            // Look backwards for ldstr
-            int back = index - 6;
-            if (back >= 0 && il[back] == OpCodes.Ldstr.Value)
-            {
-                int token = BitConverter.ToInt32(il, back + 1);
-                string str = ilModule.ResolveString(token);
-                args.Add(str);
-            }
-
-            return args;
         }
 
         private static readonly OpCode[] singleByteOpCodes = new OpCode[256];
@@ -121,10 +142,11 @@ namespace ConflictScanner.Reflection
             {
                 if (fi.GetValue(null) is OpCode op)
                 {
-                    if (op.Size == 1)
-                        singleByteOpCodes[op.Value] = op;
-                    else
-                        multiByteOpCodes[op.Value & 0xFF] = op;
+                    ushort value = (ushort)op.Value;
+                    if (value < 0x100)
+                        singleByteOpCodes[value] = op;
+                    else if ((value & 0xFF00) == 0xFE00)
+                        multiByteOpCodes[value & 0xFF] = op;
                 }
             }
         }
