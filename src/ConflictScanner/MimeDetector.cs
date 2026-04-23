@@ -35,11 +35,11 @@ namespace ConflictScanner
                 Encoding.ASCII.GetString(header, 8, 4) == "WAVE")
                 return "audio/wav";
 
-            // ZIP (Unity asset bundles sometimes)
+            // ZIP
             if (header[0] == 0x50 && header[1] == 0x4B)
                 return "application/zip";
 
-            // UnityFS bundle
+            // UnityFS
             if (Encoding.ASCII.GetString(header, 0, 6) == "UnityF")
                 return "application/unityfs";
 
@@ -52,7 +52,7 @@ namespace ConflictScanner
             if (IsMostlyText(header))
                 return "text/plain";
 
-            return "application/octet-stream"; // generic binary
+            return "application/octet-stream";
         }
 
         private static bool IsMostlyText(byte[] bytes)
@@ -62,7 +62,7 @@ namespace ConflictScanner
 
             foreach (byte b in bytes)
             {
-                if (b == 0) return false; // null byte → binary
+                if (b == 0) return false;
                 if (b >= 32 && b <= 126) printable++;
             }
 
