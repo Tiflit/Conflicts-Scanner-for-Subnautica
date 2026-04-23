@@ -25,6 +25,7 @@ namespace ConflictScanner
                 return;
             }
 
+            // JSON-based detection (Quick + Deep)
             var idMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             var techTypeMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -51,10 +52,9 @@ namespace ConflictScanner
             {
                 if (pair.Value.Count > 1)
                 {
-                    string mods = string.Join(", ", pair.Value);
                     context.AddNautilusWarning(
                         Severity.Error,
-                        $"Duplicate Nautilus Id detected: \"{pair.Key}\" used by mods: {mods}"
+                        $"Duplicate Nautilus Id detected: \"{pair.Key}\" used by mods: {string.Join(", ", pair.Value)}"
                     );
                 }
             }
@@ -63,12 +63,20 @@ namespace ConflictScanner
             {
                 if (pair.Value.Count > 1)
                 {
-                    string mods = string.Join(", ", pair.Value);
                     context.AddNautilusWarning(
                         Severity.Error,
-                        $"Duplicate Nautilus TechType detected: \"{pair.Key}\" used by mods: {mods}"
+                        $"Duplicate Nautilus TechType detected: \"{pair.Key}\" used by mods: {string.Join(", ", pair.Value)}"
                     );
                 }
+            }
+
+            // Deep Scan: reflection-based Nautilus analysis (future)
+            if (context.Mode == ScanMode.Deep)
+            {
+                context.AddNautilusWarning(
+                    Severity.Info,
+                    "Deep Scan: Reflection-based Nautilus analysis not implemented yet."
+                );
             }
         }
 
@@ -103,10 +111,9 @@ namespace ConflictScanner
             }
             catch (Exception ex)
             {
-                string relative = Path.GetFileName(filePath);
                 context.AddNautilusWarning(
                     Severity.Info,
-                    $"[{modName}] Failed to parse potential Nautilus config \"{relative}\": {ex.Message}"
+                    $"[{modName}] Failed to parse potential Nautilus config \"{Path.GetFileName(filePath)}\": {ex.Message}"
                 );
             }
         }
