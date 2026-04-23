@@ -2,10 +2,6 @@ using System.Collections.Generic;
 
 namespace ConflictScanner
 {
-    /// <summary>
-    /// Holds analyzers in the order they should run.
-    /// Profiles populate this.
-    /// </summary>
     public class AnalyzerPipeline
     {
         private readonly List<object> _analyzers = new();
