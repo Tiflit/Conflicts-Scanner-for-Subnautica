@@ -38,7 +38,6 @@ namespace ConflictScanner
                                           .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                                           .Replace('\\', '/');
 
-                    // Heuristic: only treat likely config files as Nautilus-related
                     if (!relative.Contains("nautilus", StringComparison.OrdinalIgnoreCase) &&
                         !relative.Contains("config", StringComparison.OrdinalIgnoreCase) &&
                         !relative.Contains("configs", StringComparison.OrdinalIgnoreCase))
@@ -48,7 +47,6 @@ namespace ConflictScanner
                 }
             }
 
-            // Duplicate Ids
             foreach (var pair in idMap)
             {
                 if (pair.Value.Count > 1)
@@ -61,7 +59,6 @@ namespace ConflictScanner
                 }
             }
 
-            // Duplicate TechTypes
             foreach (var pair in techTypeMap)
             {
                 if (pair.Value.Count > 1)
@@ -86,7 +83,9 @@ namespace ConflictScanner
             {
                 string json = File.ReadAllText(filePath);
 
-                // Try array of entries
+                // If this JSON isn't a Nautilus config, deserialization may succeed
+                // but Id/TechType will be null and nothing will be registered. That's fine.
+
                 var entries = JsonSerializer.Deserialize<List<NautilusEntry>>(json);
                 if (entries != null)
                 {
@@ -95,7 +94,6 @@ namespace ConflictScanner
                     return;
                 }
 
-                // Try single entry
                 var single = JsonSerializer.Deserialize<NautilusEntry>(json);
                 if (single != null)
                 {
