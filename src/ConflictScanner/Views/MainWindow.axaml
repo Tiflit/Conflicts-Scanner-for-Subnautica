@@ -1,1 +1,59 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:ConflictScanner.ViewModels"
+        x:Class="ConflictScanner.Views.MainWindow"
+        Width="900" Height="600"
+        Title="Subnautica Conflict Scanner"
+        mc:Ignorable="d">
 
+  <Design.DataContext>
+    <vm:MainWindowViewModel />
+  </Design.DataContext>
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="12">
+    <!-- Path + controls -->
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBlock Text="Game path:" VerticalAlignment="Center"/>
+      <TextBox Width="500"
+               Text="{Binding GamePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+      <Button Content="Detect"
+              Command="{Binding DetectGameCommand}"
+              IsEnabled="{Binding IsBusy, Converter={x:Static BooleanNegationConverter.Instance}}"/>
+      <CheckBox Content="Deep scan"
+                IsChecked="{Binding DeepScan}"
+                VerticalAlignment="Center"/>
+      <Button Content="Scan"
+              Command="{Binding RunScanCommand}"
+              IsEnabled="{Binding IsBusy, Converter={x:Static BooleanNegationConverter.Instance}}"/>
+    </StackPanel>
+
+    <!-- Status -->
+    <TextBlock Grid.Row="1"
+               Margin="0,8,0,4"
+               Text="{Binding Status}"/>
+
+    <!-- Report -->
+    <Border Grid.Row="2"
+            BorderBrush="Gray"
+            BorderThickness="1"
+            CornerRadius="4">
+      <ScrollViewer>
+        <TextBox Text="{Binding ReportText}"
+                 IsReadOnly="True"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 FontFamily="Consolas"
+                 Background="Transparent"
+                 BorderThickness="0"/>
+      </ScrollViewer>
+    </Border>
+
+    <!-- Footer -->
+    <TextBlock Grid.Row="3"
+               HorizontalAlignment="Right"
+               Opacity="0.6"
+               Text="ConflictScanner — prototype build"/>
+  </Grid>
+</Window>
