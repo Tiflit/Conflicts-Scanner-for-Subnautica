@@ -8,6 +8,8 @@ namespace ConflictScanner
 {
     public class FileOverrideAnalyzer
     {
+        private const long MaxHashSize = 100 * 1024 * 1024; // 100 MB
+
         public void Run(ScanContext context)
         {
             var pathMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
@@ -21,25 +23,25 @@ namespace ConflictScanner
             if (Directory.Exists(qmodsPath))
                 ScanModFolder(qmodsPath, pathMap, hashMap, context);
 
-            // Path conflicts
             foreach (var pair in pathMap)
             {
                 if (pair.Value.Count > 1)
                 {
                     string mods = string.Join(", ", pair.Value);
-                    context.FileWarnings.Add(
+                    context.AddFileWarning(
+                        Severity.Error,
                         $"Path conflict: \"{pair.Key}\" appears in multiple mods: {mods}"
                     );
                 }
             }
 
-            // Content conflicts
             foreach (var pair in hashMap)
             {
                 if (pair.Value.Count > 1)
                 {
                     string mods = string.Join(", ", pair.Value);
-                    context.FileWarnings.Add(
+                    context.AddFileWarning(
+                        Severity.Warning,
                         $"Duplicate content detected (hash {pair.Key.Substring(0, 12)}…): used by mods: {mods}"
                     );
                 }
@@ -65,19 +67,31 @@ namespace ConflictScanner
                     if (relative.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    // Heuristic checks
+                    if (IgnoreList.ShouldIgnore(relative))
+                        continue;
+
                     RunHeuristics(file, modName, relative, context);
 
-                    // Path conflict tracking
                     if (!pathMap.ContainsKey(relative))
                         pathMap[relative] = new List<string>();
                     pathMap[relative].Add(modName);
 
-                    // Hash conflict tracking
-                    string hash = ComputeHash(file);
-                    if (!hashMap.ContainsKey(hash))
-                        hashMap[hash] = new List<string>();
-                    hashMap[hash].Add($"{modName}:{relative}");
+                    FileInfo info = new FileInfo(file);
+
+                    if (info.Length <= MaxHashSize)
+                    {
+                        string hash = ComputeHash(file);
+                        if (!hashMap.ContainsKey(hash))
+                            hashMap[hash] = new List<string>();
+                        hashMap[hash].Add($"{modName}:{relative}");
+                    }
+                    else
+                    {
+                        context.AddFileWarning(
+                            Severity.Info,
+                            $"[{modName}] Skipped hashing large file (>100MB): \"{relative}\""
+                        );
+                    }
                 }
             }
         }
@@ -85,77 +99,76 @@ namespace ConflictScanner
         private void RunHeuristics(string filePath, string modName, string relative, ScanContext context)
         {
             FileInfo info = new FileInfo(filePath);
+            string ext = Path.GetExtension(relative).ToLowerInvariant();
 
-            // 1. Zero-byte files
             if (info.Length == 0)
             {
-                context.FileWarnings.Add(
-                    $"[{modName}] Zero-byte file: \"{relative}\""
-                );
+                context.AddFileWarning(Severity.Warning, $"[{modName}] Zero-byte file: \"{relative}\"");
             }
 
-            // 2. Very large files (> 50 MB)
             if (info.Length > 50 * 1024 * 1024)
             {
-                context.FileWarnings.Add(
+                context.AddFileWarning(
+                    Severity.Warning,
                     $"[{modName}] Large file (>50MB): \"{relative}\" ({info.Length / (1024 * 1024)} MB)"
                 );
             }
 
-            // 3. Suspicious file types
-            string ext = Path.GetExtension(relative).ToLowerInvariant();
             if (ext == ".meta" || ext == ".manifest" || ext == ".tmp" || ext == ".bak")
             {
-                context.FileWarnings.Add(
+                context.AddFileWarning(
+                    Severity.Info,
                     $"[{modName}] Suspicious file type: \"{relative}\""
                 );
             }
 
-            // 4. File type mismatch heuristics
             if (ext == ".png" && !LooksLikePng(filePath))
             {
-                context.FileWarnings.Add(
-                    $"[{modName}] PNG file does not appear to be a valid PNG: \"{relative}\""
+                context.AddFileWarning(
+                    Severity.Critical,
+                    $"[{modName}] PNG file does not appear to be valid: \"{relative}\""
                 );
             }
 
             if (ext == ".json" && !LooksLikeJson(filePath))
             {
-                context.FileWarnings.Add(
+                context.AddFileWarning(
+                    Severity.Warning,
                     $"[{modName}] JSON file may be invalid: \"{relative}\""
                 );
             }
-            
-            // 5. MIME-type detection
+
             string mime = MimeDetector.DetectMime(filePath);
-            
-            // Extension-based expectations
+
             if (ext == ".png" && mime != "image/png")
             {
-                context.FileWarnings.Add(
+                context.AddFileWarning(
+                    Severity.Error,
                     $"[{modName}] File extension mismatch: \"{relative}\" is PNG but detected as {mime}"
                 );
             }
-            
+
             if (ext == ".ogg" && mime != "audio/ogg")
             {
-                context.FileWarnings.Add(
+                context.AddFileWarning(
+                    Severity.Error,
                     $"[{modName}] File extension mismatch: \"{relative}\" is OGG but detected as {mime}"
                 );
             }
-            
+
             if (ext == ".json" && mime != "application/json" && mime != "text/plain")
             {
-                context.FileWarnings.Add(
+                context.AddFileWarning(
+                    Severity.Error,
                     $"[{modName}] JSON file appears invalid or binary: \"{relative}\" (detected {mime})"
                 );
             }
-            
-            // Binary file with text extension
+
             if ((ext == ".txt" || ext == ".json") &&
                 mime == "application/octet-stream")
             {
-                context.FileWarnings.Add(
+                context.AddFileWarning(
+                    Severity.Warning,
                     $"[{modName}] Text file appears to be binary: \"{relative}\""
                 );
             }
@@ -169,7 +182,6 @@ namespace ConflictScanner
                 using var stream = File.OpenRead(file);
                 stream.Read(header, 0, 8);
 
-                // PNG signature: 89 50 4E 47 0D 0A 1A 0A
                 return header[0] == 0x89 &&
                        header[1] == 0x50 &&
                        header[2] == 0x4E &&
