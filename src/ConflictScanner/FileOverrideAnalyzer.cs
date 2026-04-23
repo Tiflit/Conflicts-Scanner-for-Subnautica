@@ -35,15 +35,18 @@ namespace ConflictScanner
                 }
             }
 
-            foreach (var pair in hashMap)
+            if (context.Mode == ScanMode.Deep)
             {
-                if (pair.Value.Count > 1)
+                foreach (var pair in hashMap)
                 {
-                    string mods = string.Join(", ", pair.Value);
-                    context.AddFileWarning(
-                        Severity.Warning,
-                        $"Duplicate content detected (hash {pair.Key.Substring(0, 12)}…): used by mods: {mods}"
-                    );
+                    if (pair.Value.Count > 1)
+                    {
+                        string mods = string.Join(", ", pair.Value);
+                        context.AddFileWarning(
+                            Severity.Warning,
+                            $"Duplicate content detected (hash {pair.Key.Substring(0, 12)}…): used by mods: {mods}"
+                        );
+                    }
                 }
             }
         }
@@ -76,21 +79,24 @@ namespace ConflictScanner
                         pathMap[relative] = new List<string>();
                     pathMap[relative].Add(modName);
 
-                    FileInfo info = new FileInfo(file);
+                    if (context.Mode == ScanMode.Deep)
+                    {
+                        FileInfo info = new FileInfo(file);
 
-                    if (info.Length <= MaxHashSize)
-                    {
-                        string hash = ComputeHash(file);
-                        if (!hashMap.ContainsKey(hash))
-                            hashMap[hash] = new List<string>();
-                        hashMap[hash].Add($"{modName}:{relative}");
-                    }
-                    else
-                    {
-                        context.AddFileWarning(
-                            Severity.Info,
-                            $"[{modName}] Skipped hashing large file (>100MB): \"{relative}\""
-                        );
+                        if (info.Length <= MaxHashSize)
+                        {
+                            string hash = ComputeHash(file);
+                            if (!hashMap.ContainsKey(hash))
+                                hashMap[hash] = new List<string>();
+                            hashMap[hash].Add($"{modName}:{relative}");
+                        }
+                        else
+                        {
+                            context.AddFileWarning(
+                                Severity.Info,
+                                $"[{modName}] Skipped hashing large file (>100MB): \"{relative}\""
+                            );
+                        }
                     }
                 }
             }
@@ -122,6 +128,8 @@ namespace ConflictScanner
                 );
             }
 
+            bool looksJson = ext == ".json" && LooksLikeJson(filePath);
+
             if (ext == ".png" && !LooksLikePng(filePath))
             {
                 context.AddFileWarning(
@@ -130,7 +138,7 @@ namespace ConflictScanner
                 );
             }
 
-            if (ext == ".json" && !LooksLikeJson(filePath))
+            if (ext == ".json" && !looksJson)
             {
                 context.AddFileWarning(
                     Severity.Warning,
@@ -138,6 +146,7 @@ namespace ConflictScanner
                 );
             }
 
+            // MIME checks only if JSON looks structurally like JSON
             string mime = MimeDetector.DetectMime(filePath);
 
             if (ext == ".png" && mime != "image/png")
@@ -156,7 +165,8 @@ namespace ConflictScanner
                 );
             }
 
-            if (ext == ".json" && mime != "application/json" && mime != "text/plain")
+            if (ext == ".json" && looksJson &&
+                mime != "application/json" && mime != "text/plain")
             {
                 context.AddFileWarning(
                     Severity.Error,
