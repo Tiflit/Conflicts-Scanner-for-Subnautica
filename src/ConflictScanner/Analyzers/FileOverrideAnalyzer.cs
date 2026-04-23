@@ -23,28 +23,28 @@ namespace ConflictScanner
             if (Directory.Exists(qmodsPath))
                 ScanModFolder(qmodsPath, pathMap, hashMap, context);
 
+            // Path conflicts (Quick + Deep)
             foreach (var pair in pathMap)
             {
                 if (pair.Value.Count > 1)
                 {
-                    string mods = string.Join(", ", pair.Value);
                     context.AddFileWarning(
                         Severity.Error,
-                        $"Path conflict: \"{pair.Key}\" appears in multiple mods: {mods}"
+                        $"Path conflict: \"{pair.Key}\" appears in multiple mods: {string.Join(", ", pair.Value)}"
                     );
                 }
             }
 
+            // Deep Scan: content hashing
             if (context.Mode == ScanMode.Deep)
             {
                 foreach (var pair in hashMap)
                 {
                     if (pair.Value.Count > 1)
                     {
-                        string mods = string.Join(", ", pair.Value);
                         context.AddFileWarning(
                             Severity.Warning,
-                            $"Duplicate content detected (hash {pair.Key.Substring(0, 12)}…): used by mods: {mods}"
+                            $"Duplicate content detected (hash {pair.Key.Substring(0, 12)}…): used by mods: {string.Join(", ", pair.Value)}"
                         );
                     }
                 }
@@ -73,30 +73,48 @@ namespace ConflictScanner
                     if (IgnoreList.ShouldIgnore(relative))
                         continue;
 
+                    // Quick Scan: only minimal heuristics
+                    if (context.Mode == ScanMode.Quick)
+                    {
+                        FileInfo info = new FileInfo(file);
+
+                        if (info.Length == 0)
+                        {
+                            context.AddFileWarning(
+                                Severity.Warning,
+                                $"[{modName}] Zero-byte file: \"{relative}\""
+                            );
+                        }
+
+                        if (!pathMap.ContainsKey(relative))
+                            pathMap[relative] = new List<string>();
+                        pathMap[relative].Add(modName);
+
+                        continue;
+                    }
+
+                    // Deep Scan: full heuristics
                     RunHeuristics(file, modName, relative, context);
 
                     if (!pathMap.ContainsKey(relative))
                         pathMap[relative] = new List<string>();
                     pathMap[relative].Add(modName);
 
-                    if (context.Mode == ScanMode.Deep)
-                    {
-                        FileInfo info = new FileInfo(file);
+                    FileInfo deepInfo = new FileInfo(file);
 
-                        if (info.Length <= MaxHashSize)
-                        {
-                            string hash = ComputeHash(file);
-                            if (!hashMap.ContainsKey(hash))
-                                hashMap[hash] = new List<string>();
-                            hashMap[hash].Add($"{modName}:{relative}");
-                        }
-                        else
-                        {
-                            context.AddFileWarning(
-                                Severity.Info,
-                                $"[{modName}] Skipped hashing large file (>100MB): \"{relative}\""
-                            );
-                        }
+                    if (deepInfo.Length <= MaxHashSize)
+                    {
+                        string hash = ComputeHash(file);
+                        if (!hashMap.ContainsKey(hash))
+                            hashMap[hash] = new List<string>();
+                        hashMap[hash].Add($"{modName}:{relative}");
+                    }
+                    else
+                    {
+                        context.AddFileWarning(
+                            Severity.Info,
+                            $"[{modName}] Skipped hashing large file (>100MB): \"{relative}\""
+                        );
                     }
                 }
             }
@@ -146,7 +164,6 @@ namespace ConflictScanner
                 );
             }
 
-            // MIME checks only if JSON looks structurally like JSON
             string mime = MimeDetector.DetectMime(filePath);
 
             if (ext == ".png" && mime != "image/png")
