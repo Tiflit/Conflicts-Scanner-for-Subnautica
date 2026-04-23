@@ -2,6 +2,9 @@ using System.Reflection;
 
 namespace ConflictScanner.Reflection
 {
+    /// <summary>
+    /// Known Nautilus API signatures for reflection-based detection.
+    /// </summary>
     public static class NautilusSignatures
     {
         public static bool IsTechTypeRegistration(MethodInfo method)
