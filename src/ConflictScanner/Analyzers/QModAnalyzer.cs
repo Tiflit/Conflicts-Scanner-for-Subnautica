@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace ConflictScanner
 {
-    public class QModAnalyzer
+    public class QModAnalyzer : IAnalyzer
     {
         private class QModManifest
         {
