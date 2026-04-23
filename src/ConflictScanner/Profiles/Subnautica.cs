@@ -1,4 +1,5 @@
 using System.IO;
+using ConflictScanner.Reflection;
 
 namespace ConflictScanner.Profiles
 {
@@ -18,9 +19,10 @@ namespace ConflictScanner.Profiles
             pipeline.Add(new NautilusAnalyzer());
             pipeline.Add(new QModAnalyzer());
             pipeline.Add(new FileOverrideAnalyzer());
-            
+
             // Deep Scan reflection analyzers
-            pipeline.Add(new ConflictScanner.Reflection.NautilusReflectionAnalyzer());
+            pipeline.Add(new NautilusReflectionAnalyzer());
+            pipeline.Add(new HarmonyReflectionAnalyzer());
         }
     }
 }
