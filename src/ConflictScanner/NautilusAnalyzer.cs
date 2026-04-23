@@ -18,7 +18,10 @@ namespace ConflictScanner
             string bepPath = Path.Combine(context.GamePath, "BepInEx", "plugins");
             if (!Directory.Exists(bepPath))
             {
-                context.AddNautilusWarning(Severity.Info, "No BepInEx/plugins folder found. Skipping Nautilus analysis.");
+                context.AddNautilusWarning(
+                    Severity.Info,
+                    "No BepInEx/plugins folder found. Skipping Nautilus analysis."
+                );
                 return;
             }
 
@@ -29,24 +32,23 @@ namespace ConflictScanner
             {
                 string modName = Path.GetFileName(modFolder);
 
-                // Heuristic: look for Nautilus-related config folders/files
                 foreach (var file in Directory.GetFiles(modFolder, "*.json", SearchOption.AllDirectories))
                 {
                     string relative = file.Substring(modFolder.Length)
                                           .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                                           .Replace('\\', '/');
 
-                    // Only look at likely config locations
-                    if (!relative.Contains("Nautilus", StringComparison.OrdinalIgnoreCase) &&
-                        !relative.Contains("Config", StringComparison.OrdinalIgnoreCase) &&
-                        !relative.Contains("Configs", StringComparison.OrdinalIgnoreCase))
+                    // Heuristic: only treat likely config files as Nautilus-related
+                    if (!relative.Contains("nautilus", StringComparison.OrdinalIgnoreCase) &&
+                        !relative.Contains("config", StringComparison.OrdinalIgnoreCase) &&
+                        !relative.Contains("configs", StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     TryParseConfig(file, modName, idMap, techTypeMap, context);
                 }
             }
 
-            // Duplicate IDs
+            // Duplicate Ids
             foreach (var pair in idMap)
             {
                 if (pair.Value.Count > 1)
