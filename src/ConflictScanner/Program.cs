@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using ConflictScanner.Profiles;
 
 namespace ConflictScanner
 {
@@ -29,7 +30,19 @@ namespace ConflictScanner
                 return;
             }
 
+            // Detect game profile
+            var profile = ProfileManager.DetectProfile(gamePath);
+
+            if (profile == null)
+            {
+                Console.WriteLine("Could not detect a supported game at this path.");
+                return;
+            }
+
+            Console.WriteLine($"Detected game: {profile.GameName}");
             Console.WriteLine();
+
+            // Choose scan mode
             Console.WriteLine("Choose scan mode:");
             Console.WriteLine("1. Quick Scan (fast)");
             Console.WriteLine("2. Deep Scan (slower, more thorough)");
@@ -40,14 +53,25 @@ namespace ConflictScanner
 
             var context = new ScanContext(gamePath, mode);
 
+            // Build analyzer pipeline
+            var pipeline = new AnalyzerPipeline();
+            profile.RegisterAnalyzers(pipeline);
+
             var stopwatch = Stopwatch.StartNew();
 
-            new HarmonyAnalyzer().Run(context);
-            new NautilusAnalyzer().Run(context);
-            new QModAnalyzer().Run(context);
-            new FileOverrideAnalyzer().Run(context);
+            // Run analyzers in order
+            foreach (var analyzer in pipeline.GetAnalyzers())
+            {
+                switch (analyzer)
+                {
+                    case HarmonyAnalyzer h: h.Run(context); break;
+                    case NautilusAnalyzer n: n.Run(context); break;
+                    case QModAnalyzer q: q.Run(context); break;
+                    case FileOverrideAnalyzer f: f.Run(context); break;
+                }
+            }
 
-            // Suggestion engine will consume the context later
+            // Suggestions
             SuggestionEngine.Generate(context);
 
             stopwatch.Stop();
