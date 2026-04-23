@@ -13,17 +13,15 @@ namespace ConflictScanner
             var pathMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             var hashMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
-            // Scan BepInEx plugins
             string bepPath = Path.Combine(context.GamePath, "BepInEx", "plugins");
             if (Directory.Exists(bepPath))
-                ScanModFolder(bepPath, pathMap, hashMap);
+                ScanModFolder(bepPath, pathMap, hashMap, context);
 
-            // Scan QMods
             string qmodsPath = Path.Combine(context.GamePath, "QMods");
             if (Directory.Exists(qmodsPath))
-                ScanModFolder(qmodsPath, pathMap, hashMap);
+                ScanModFolder(qmodsPath, pathMap, hashMap, context);
 
-            // Detect path conflicts (same relative path)
+            // Path conflicts
             foreach (var pair in pathMap)
             {
                 if (pair.Value.Count > 1)
@@ -35,7 +33,7 @@ namespace ConflictScanner
                 }
             }
 
-            // Detect content conflicts (same hash)
+            // Content conflicts
             foreach (var pair in hashMap)
             {
                 if (pair.Value.Count > 1)
@@ -51,7 +49,8 @@ namespace ConflictScanner
         private void ScanModFolder(
             string root,
             Dictionary<string, List<string>> pathMap,
-            Dictionary<string, List<string>> hashMap)
+            Dictionary<string, List<string>> hashMap,
+            ScanContext context)
         {
             foreach (var modFolder in Directory.GetDirectories(root))
             {
@@ -59,28 +58,100 @@ namespace ConflictScanner
 
                 foreach (var file in Directory.GetFiles(modFolder, "*", SearchOption.AllDirectories))
                 {
-                    // Normalize relative path
                     string relative = file.Substring(modFolder.Length)
                                           .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                                           .Replace('\\', '/');
 
-                    // Skip DLLs — handled by Harmony/Nautilus analyzers
                     if (relative.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    // Register path conflict
+                    // Heuristic checks
+                    RunHeuristics(file, modName, relative, context);
+
+                    // Path conflict tracking
                     if (!pathMap.ContainsKey(relative))
                         pathMap[relative] = new List<string>();
                     pathMap[relative].Add(modName);
 
-                    // Compute hash
+                    // Hash conflict tracking
                     string hash = ComputeHash(file);
-
                     if (!hashMap.ContainsKey(hash))
                         hashMap[hash] = new List<string>();
                     hashMap[hash].Add($"{modName}:{relative}");
                 }
             }
+        }
+
+        private void RunHeuristics(string filePath, string modName, string relative, ScanContext context)
+        {
+            FileInfo info = new FileInfo(filePath);
+
+            // 1. Zero-byte files
+            if (info.Length == 0)
+            {
+                context.FileWarnings.Add(
+                    $"[{modName}] Zero-byte file: \"{relative}\""
+                );
+            }
+
+            // 2. Very large files (> 50 MB)
+            if (info.Length > 50 * 1024 * 1024)
+            {
+                context.FileWarnings.Add(
+                    $"[{modName}] Large file (>50MB): \"{relative}\" ({info.Length / (1024 * 1024)} MB)"
+                );
+            }
+
+            // 3. Suspicious file types
+            string ext = Path.GetExtension(relative).ToLowerInvariant();
+            if (ext == ".meta" || ext == ".manifest" || ext == ".tmp" || ext == ".bak")
+            {
+                context.FileWarnings.Add(
+                    $"[{modName}] Suspicious file type: \"{relative}\""
+                );
+            }
+
+            // 4. File type mismatch heuristics
+            if (ext == ".png" && !LooksLikePng(filePath))
+            {
+                context.FileWarnings.Add(
+                    $"[{modName}] PNG file does not appear to be a valid PNG: \"{relative}\""
+                );
+            }
+
+            if (ext == ".json" && !LooksLikeJson(filePath))
+            {
+                context.FileWarnings.Add(
+                    $"[{modName}] JSON file may be invalid: \"{relative}\""
+                );
+            }
+        }
+
+        private bool LooksLikePng(string file)
+        {
+            try
+            {
+                byte[] header = new byte[8];
+                using var stream = File.OpenRead(file);
+                stream.Read(header, 0, 8);
+
+                // PNG signature: 89 50 4E 47 0D 0A 1A 0A
+                return header[0] == 0x89 &&
+                       header[1] == 0x50 &&
+                       header[2] == 0x4E &&
+                       header[3] == 0x47;
+            }
+            catch { return false; }
+        }
+
+        private bool LooksLikeJson(string file)
+        {
+            try
+            {
+                string text = File.ReadAllText(file).Trim();
+                return text.StartsWith("{") || text.StartsWith("[");
+            }
+            catch { return false; }
         }
 
         private string ComputeHash(string filePath)
