@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 
 namespace ConflictScanner
@@ -8,15 +9,19 @@ namespace ConflictScanner
         static void Main(string[] args)
         {
             Console.WriteLine("=== Subnautica Mod Conflict Scanner ===");
+            Console.WriteLine();
+
+            string gamePath;
 
             if (args.Length == 0)
             {
                 Console.WriteLine("Enter the path to your Subnautica installation:");
-                string input = Console.ReadLine();
-                args = new[] { input };
+                gamePath = Console.ReadLine()?.Trim() ?? string.Empty;
             }
-
-            string gamePath = args[0];
+            else
+            {
+                gamePath = args[0];
+            }
 
             if (!Directory.Exists(gamePath))
             {
@@ -24,12 +29,29 @@ namespace ConflictScanner
                 return;
             }
 
-            var context = new ScanContext(gamePath);
+            Console.WriteLine();
+            Console.WriteLine("Choose scan mode:");
+            Console.WriteLine("1. Quick Scan (fast)");
+            Console.WriteLine("2. Deep Scan (slower, more thorough)");
+            Console.Write("Selection [1/2]: ");
+
+            string choice = Console.ReadLine()?.Trim();
+            var mode = choice == "2" ? ScanMode.Deep : ScanMode.Quick;
+
+            var context = new ScanContext(gamePath, mode);
+
+            var stopwatch = Stopwatch.StartNew();
 
             new HarmonyAnalyzer().Run(context);
             new NautilusAnalyzer().Run(context);
             new QModAnalyzer().Run(context);
             new FileOverrideAnalyzer().Run(context);
+
+            // Suggestion engine will consume the context later
+            SuggestionEngine.Generate(context);
+
+            stopwatch.Stop();
+            context.ScanDuration = stopwatch.Elapsed;
 
             string report = ReportGenerator.Generate(context);
 
