@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace ConflictScanner
 {
@@ -18,11 +19,11 @@ namespace ConflictScanner
 
         public static bool ShouldIgnore(string relativePath)
         {
-            string ext = System.IO.Path.GetExtension(relativePath);
+            string ext = Path.GetExtension(relativePath);
             if (Extensions.Contains(ext))
                 return true;
 
-            string name = System.IO.Path.GetFileNameWithoutExtension(relativePath);
+            string name = Path.GetFileNameWithoutExtension(relativePath);
             if (FileNames.Contains(name))
                 return true;
 
