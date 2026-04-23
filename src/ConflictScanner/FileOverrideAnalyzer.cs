@@ -125,6 +125,40 @@ namespace ConflictScanner
                     $"[{modName}] JSON file may be invalid: \"{relative}\""
                 );
             }
+            
+            // 5. MIME-type detection
+            string mime = MimeDetector.DetectMime(filePath);
+            
+            // Extension-based expectations
+            if (ext == ".png" && mime != "image/png")
+            {
+                context.FileWarnings.Add(
+                    $"[{modName}] File extension mismatch: \"{relative}\" is PNG but detected as {mime}"
+                );
+            }
+            
+            if (ext == ".ogg" && mime != "audio/ogg")
+            {
+                context.FileWarnings.Add(
+                    $"[{modName}] File extension mismatch: \"{relative}\" is OGG but detected as {mime}"
+                );
+            }
+            
+            if (ext == ".json" && mime != "application/json" && mime != "text/plain")
+            {
+                context.FileWarnings.Add(
+                    $"[{modName}] JSON file appears invalid or binary: \"{relative}\" (detected {mime})"
+                );
+            }
+            
+            // Binary file with text extension
+            if ((ext == ".txt" || ext == ".json") &&
+                mime == "application/octet-stream")
+            {
+                context.FileWarnings.Add(
+                    $"[{modName}] Text file appears to be binary: \"{relative}\""
+                );
+            }
         }
 
         private bool LooksLikePng(string file)
