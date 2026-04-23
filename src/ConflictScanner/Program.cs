@@ -30,7 +30,6 @@ namespace ConflictScanner
                 return;
             }
 
-            // Detect game profile
             var profile = ProfileManager.DetectProfile(gamePath);
 
             if (profile == null)
@@ -42,7 +41,6 @@ namespace ConflictScanner
             Console.WriteLine($"Detected game: {profile.GameName}");
             Console.WriteLine();
 
-            // Choose scan mode
             Console.WriteLine("Choose scan mode:");
             Console.WriteLine("1. Quick Scan (fast)");
             Console.WriteLine("2. Deep Scan (slower, more thorough)");
@@ -53,25 +51,16 @@ namespace ConflictScanner
 
             var context = new ScanContext(gamePath, mode);
 
-            // Build analyzer pipeline
             var pipeline = new AnalyzerPipeline();
             profile.RegisterAnalyzers(pipeline);
 
             var stopwatch = Stopwatch.StartNew();
 
-            // Run analyzers in order
             foreach (var analyzer in pipeline.GetAnalyzers())
             {
-                switch (analyzer)
-                {
-                    case HarmonyAnalyzer h: h.Run(context); break;
-                    case NautilusAnalyzer n: n.Run(context); break;
-                    case QModAnalyzer q: q.Run(context); break;
-                    case FileOverrideAnalyzer f: f.Run(context); break;
-                }
+                analyzer.Run(context);
             }
 
-            // Suggestions
             SuggestionEngine.Generate(context);
 
             stopwatch.Stop();
