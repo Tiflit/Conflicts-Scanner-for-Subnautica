@@ -6,12 +6,17 @@ using System.Reflection;
 
 namespace ConflictScanner.Reflection
 {
-    /// <summary>
-    /// Reflection-based Nautilus analysis for Deep Scan mode.
-    /// Detects TechType, CraftTree, and Sprite registrations.
-    /// </summary>
     public class NautilusReflectionAnalyzer
     {
+        private readonly Dictionary<string, List<string>> techTypeMap =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly Dictionary<string, List<string>> craftTreeMap =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly Dictionary<string, List<string>> spriteMap =
+            new(StringComparer.OrdinalIgnoreCase);
+
         public void Run(ScanContext context)
         {
             if (context.Mode == ScanMode.Quick)
@@ -30,6 +35,8 @@ namespace ConflictScanner.Reflection
                     AnalyzeAssembly(dll, modName, context);
                 }
             }
+
+            ReportConflicts(context);
         }
 
         private void AnalyzeAssembly(string dllPath, string modName, ScanContext context)
@@ -59,28 +66,70 @@ namespace ConflictScanner.Reflection
 
         private void AnalyzeMethod(MethodInfo method, string modName, ScanContext context)
         {
-            if (NautilusSignatures.IsTechTypeRegistration(method))
+            foreach (var (target, args) in ILReader.FindCalls(method))
             {
-                context.AddNautilusWarning(
-                    Severity.Info,
-                    $"[{modName}] Registers a TechType via {method.DeclaringType.Name}.{method.Name}"
-                );
+                if (NautilusSignatures.IsTechTypeRegistration(target))
+                {
+                    string id = args.FirstOrDefault() as string ?? "(unknown)";
+                    Register(techTypeMap, id, modName);
+                }
+
+                if (NautilusSignatures.IsCraftTreeRegistration(target))
+                {
+                    string path = args.FirstOrDefault() as string ?? "(unknown)";
+                    Register(craftTreeMap, path, modName);
+                }
+
+                if (NautilusSignatures.IsSpriteRegistration(target))
+                {
+                    string key = args.FirstOrDefault() as string ?? "(unknown)";
+                    Register(spriteMap, key, modName);
+                }
+            }
+        }
+
+        private void Register(Dictionary<string, List<string>> map, string key, string modName)
+        {
+            if (!map.ContainsKey(key))
+                map[key] = new List<string>();
+
+            if (!map[key].Contains(modName))
+                map[key].Add(modName);
+        }
+
+        private void ReportConflicts(ScanContext context)
+        {
+            foreach (var pair in techTypeMap)
+            {
+                if (pair.Value.Count > 1)
+                {
+                    context.AddNautilusWarning(
+                        Severity.Error,
+                        $"Duplicate TechType detected: \"{pair.Key}\" used by {string.Join(", ", pair.Value)}"
+                    );
+                }
             }
 
-            if (NautilusSignatures.IsCraftTreeRegistration(method))
+            foreach (var pair in craftTreeMap)
             {
-                context.AddNautilusWarning(
-                    Severity.Info,
-                    $"[{modName}] Registers a CraftTree node via {method.DeclaringType.Name}.{method.Name}"
-                );
+                if (pair.Value.Count > 1)
+                {
+                    context.AddNautilusWarning(
+                        Severity.Warning,
+                        $"CraftTree conflict: \"{pair.Key}\" added by {string.Join(", ", pair.Value)}"
+                    );
+                }
             }
 
-            if (NautilusSignatures.IsSpriteRegistration(method))
+            foreach (var pair in spriteMap)
             {
-                context.AddNautilusWarning(
-                    Severity.Info,
-                    $"[{modName}] Registers a sprite via {method.DeclaringType.Name}.{method.Name}"
-                );
+                if (pair.Value.Count > 1)
+                {
+                    context.AddNautilusWarning(
+                        Severity.Warning,
+                        $"Sprite key conflict: \"{pair.Key}\" used by {string.Join(", ", pair.Value)}"
+                    );
+                }
             }
         }
     }
