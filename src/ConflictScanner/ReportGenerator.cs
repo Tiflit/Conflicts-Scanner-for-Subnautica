@@ -11,11 +11,16 @@ namespace ConflictScanner
 
             sb.AppendLine("=== Subnautica Mod Conflict Report ===");
             sb.AppendLine();
+            sb.AppendLine($"Scan mode: {context.Mode}");
+            sb.AppendLine($"Duration: {context.ScanDuration.TotalSeconds:F2} seconds");
+            sb.AppendLine();
 
             AppendSection(sb, "Harmony Conflicts", context.HarmonyWarnings);
             AppendSection(sb, "Nautilus Conflicts", context.NautilusWarnings);
             AppendSection(sb, "QMod Conflicts", context.QModWarnings);
             AppendSection(sb, "File Conflicts", context.FileWarnings);
+
+            AppendSuggestions(sb, context.Suggestions);
 
             return sb.ToString();
         }
@@ -36,6 +41,25 @@ namespace ConflictScanner
                 foreach (var (level, message) in items)
                 {
                     sb.AppendLine($"[{level}] {message}");
+                }
+            }
+
+            sb.AppendLine();
+        }
+
+        private static void AppendSuggestions(StringBuilder sb, List<string> suggestions)
+        {
+            sb.AppendLine("## Suggestions");
+
+            if (suggestions.Count == 0)
+            {
+                sb.AppendLine("No suggestions available yet.");
+            }
+            else
+            {
+                foreach (var suggestion in suggestions)
+                {
+                    sb.AppendLine($"- {suggestion}");
                 }
             }
 
