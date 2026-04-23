@@ -6,7 +6,7 @@ using System.Text;
 
 namespace ConflictScanner
 {
-    public class FileOverrideAnalyzer
+    public class FileOverrideAnalyzer : IAnalyzer
     {
         private const long MaxHashSize = 100 * 1024 * 1024; // 100 MB
 
@@ -23,7 +23,6 @@ namespace ConflictScanner
             if (Directory.Exists(qmodsPath))
                 ScanModFolder(qmodsPath, pathMap, hashMap, context);
 
-            // Path conflicts (Quick + Deep)
             foreach (var pair in pathMap)
             {
                 if (pair.Value.Count > 1)
@@ -35,7 +34,6 @@ namespace ConflictScanner
                 }
             }
 
-            // Deep Scan: content hashing
             if (context.Mode == ScanMode.Deep)
             {
                 foreach (var pair in hashMap)
@@ -73,7 +71,6 @@ namespace ConflictScanner
                     if (IgnoreList.ShouldIgnore(relative))
                         continue;
 
-                    // Quick Scan: only minimal heuristics
                     if (context.Mode == ScanMode.Quick)
                     {
                         FileInfo info = new FileInfo(file);
@@ -93,7 +90,6 @@ namespace ConflictScanner
                         continue;
                     }
 
-                    // Deep Scan: full heuristics
                     RunHeuristics(file, modName, relative, context);
 
                     if (!pathMap.ContainsKey(relative))
