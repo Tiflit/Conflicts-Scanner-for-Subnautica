@@ -10,7 +10,7 @@ namespace ConflictScanner.Reflection
     /// Reflection-based Harmony patch analysis for Deep Scan mode.
     /// Detects prefix/postfix/transpiler/finalizer patches and reports conflicts.
     /// </summary>
-    public class HarmonyReflectionAnalyzer
+    public class HarmonyReflectionAnalyzer : IAnalyzer
     {
         private class PatchInfo
         {
@@ -71,17 +71,17 @@ namespace ConflictScanner.Reflection
 
         private void AnalyzeMethod(MethodInfo method, string modName, ScanContext context)
         {
-            // Harmony patch attributes
-            var prefix = method.GetCustomAttribute(Type.GetType("HarmonyLib.HarmonyPrefix"));
-            var postfix = method.GetCustomAttribute(Type.GetType("HarmonyLib.HarmonyPostfix"));
-            var transpiler = method.GetCustomAttribute(Type.GetType("HarmonyLib.HarmonyTranspiler"));
-            var finalizer = method.GetCustomAttribute(Type.GetType("HarmonyLib.HarmonyFinalizer"));
+            var attrs = method.GetCustomAttributes().ToArray();
 
-            if (prefix == null && postfix == null && transpiler == null && finalizer == null)
+            bool hasPrefix = attrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyPrefix");
+            bool hasPostfix = attrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyPostfix");
+            bool hasTranspiler = attrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyTranspiler");
+            bool hasFinalizer = attrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyFinalizer");
+
+            if (!hasPrefix && !hasPostfix && !hasTranspiler && !hasFinalizer)
                 return;
 
-            // Determine target method
-            var harmonyPatch = method.GetCustomAttribute(Type.GetType("HarmonyLib.HarmonyPatch"));
+            var harmonyPatch = attrs.FirstOrDefault(a => a.GetType().FullName == "HarmonyLib.HarmonyPatch");
             if (harmonyPatch == null)
                 return;
 
@@ -95,32 +95,28 @@ namespace ConflictScanner.Reflection
                 return;
             }
 
-            // Determine priority
-            int priority = ExtractPriority(method);
+            int priority = ExtractPriority(attrs);
 
-            // Register patches
-            if (prefix != null)
+            if (hasPrefix)
                 patches.Add(new PatchInfo { ModName = modName, PatchType = "Prefix", Priority = priority, TargetMethod = target });
 
-            if (postfix != null)
+            if (hasPostfix)
                 patches.Add(new PatchInfo { ModName = modName, PatchType = "Postfix", Priority = priority, TargetMethod = target });
 
-            if (transpiler != null)
+            if (hasTranspiler)
                 patches.Add(new PatchInfo { ModName = modName, PatchType = "Transpiler", Priority = priority, TargetMethod = target });
 
-            if (finalizer != null)
+            if (hasFinalizer)
                 patches.Add(new PatchInfo { ModName = modName, PatchType = "Finalizer", Priority = priority, TargetMethod = target });
         }
 
-        private MethodInfo ResolveTargetMethod(Attribute harmonyPatch)
+        private MethodInfo ResolveTargetMethod(object harmonyPatch)
         {
-            // HarmonyPatch has fields like:
-            // - originalType
-            // - methodName
-            // - argumentTypes
-            var typeField = harmonyPatch.GetType().GetField("originalType");
-            var nameField = harmonyPatch.GetType().GetField("methodName");
-            var argsField = harmonyPatch.GetType().GetField("argumentTypes");
+            var type = harmonyPatch.GetType();
+
+            var typeField = type.GetField("originalType");
+            var nameField = type.GetField("methodName");
+            var argsField = type.GetField("argumentTypes");
 
             Type targetType = typeField?.GetValue(harmonyPatch) as Type;
             string methodName = nameField?.GetValue(harmonyPatch) as string;
@@ -135,13 +131,11 @@ namespace ConflictScanner.Reflection
             return targetType.GetMethod(methodName);
         }
 
-        private int ExtractPriority(MethodInfo method)
+        private int ExtractPriority(object[] attrs)
         {
-            var priorityAttr = method.GetCustomAttributes()
-                .FirstOrDefault(a => a.GetType().Name == "HarmonyPriority");
-
+            var priorityAttr = attrs.FirstOrDefault(a => a.GetType().FullName == "HarmonyLib.HarmonyPriority");
             if (priorityAttr == null)
-                return 400; // Harmony default priority
+                return 400; // Harmony default
 
             var field = priorityAttr.GetType().GetField("priority");
             if (field == null)
@@ -159,7 +153,6 @@ namespace ConflictScanner.Reflection
                 var list = group.ToList();
                 string targetName = $"{group.Key.DeclaringType.FullName}.{group.Key.Name}";
 
-                // Multiple transpilers = high risk
                 var transpilers = list.Where(p => p.PatchType == "Transpiler").ToList();
                 if (transpilers.Count > 1)
                 {
@@ -169,7 +162,6 @@ namespace ConflictScanner.Reflection
                     );
                 }
 
-                // Prefix priority conflicts
                 var prefixes = list.Where(p => p.PatchType == "Prefix").ToList();
                 if (prefixes.Count > 1)
                 {
@@ -191,14 +183,8 @@ namespace ConflictScanner.Reflection
                     }
                 }
 
-                // Mods skipping original execution
-                if (prefixes.Any(p => p.Priority < 0))
-                {
-                    context.AddHarmonyWarning(
-                        Severity.Info,
-                        $"Mod skipping original execution on {targetName}: {string.Join(", ", prefixes.Where(p => p.Priority < 0).Select(p => p.ModName))}"
-                    );
-                }
+                // NOTE: Detecting skip-original would require IL analysis of prefix return values.
+                // Not implemented yet on purpose to avoid false positives.
             }
         }
     }
