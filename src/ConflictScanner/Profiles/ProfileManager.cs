@@ -6,8 +6,7 @@ namespace ConflictScanner.Profiles
     {
         private static readonly List<GameProfile> Profiles = new()
         {
-            new SubnauticaProfile()
-            // Future: add more profiles here
+            new Subnautica()
         };
 
         public static GameProfile DetectProfile(string gamePath)
