@@ -4,10 +4,10 @@ namespace ConflictScanner
 {
     public class AnalyzerPipeline
     {
-        private readonly List<object> _analyzers = new();
+        private readonly List<IAnalyzer> _analyzers = new();
 
-        public void Add(object analyzer) => _analyzers.Add(analyzer);
+        public void Add(IAnalyzer analyzer) => _analyzers.Add(analyzer);
 
-        public IEnumerable<object> GetAnalyzers() => _analyzers;
+        public IEnumerable<IAnalyzer> GetAnalyzers() => _analyzers;
     }
 }
