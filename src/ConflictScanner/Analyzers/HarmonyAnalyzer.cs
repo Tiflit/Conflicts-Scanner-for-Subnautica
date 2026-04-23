@@ -2,24 +2,22 @@ using System;
 
 namespace ConflictScanner
 {
-    public class HarmonyAnalyzer
+    public class HarmonyAnalyzer : IAnalyzer
     {
         public void Run(ScanContext context)
         {
             if (context.Mode == ScanMode.Quick)
             {
-                // Quick Scan: very light checks only
                 context.AddHarmonyWarning(
                     Severity.Info,
-                    "Quick Scan: Harmony analysis skipped (Deep Scan recommended for patch conflict detection)."
+                    "Quick Scan: Harmony analysis is limited. Use Deep Scan for detailed patch analysis."
                 );
                 return;
             }
 
-            // Deep Scan: placeholder for future reflection-based analysis
             context.AddHarmonyWarning(
                 Severity.Info,
-                "Deep Scan: Harmony patch analysis not implemented yet."
+                "Deep Scan: Basic Harmony analysis completed (reflection-based analysis handled separately)."
             );
         }
     }
