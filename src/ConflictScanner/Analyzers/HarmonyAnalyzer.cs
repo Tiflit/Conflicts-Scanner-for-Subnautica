@@ -6,10 +6,20 @@ namespace ConflictScanner
     {
         public void Run(ScanContext context)
         {
-            // Quick vs Deep behavior can be added later
+            if (context.Mode == ScanMode.Quick)
+            {
+                // Quick Scan: very light checks only
+                context.AddHarmonyWarning(
+                    Severity.Info,
+                    "Quick Scan: Harmony analysis skipped (Deep Scan recommended for patch conflict detection)."
+                );
+                return;
+            }
+
+            // Deep Scan: placeholder for future reflection-based analysis
             context.AddHarmonyWarning(
                 Severity.Info,
-                "[TODO] Harmony analysis not implemented yet."
+                "Deep Scan: Harmony patch analysis not implemented yet."
             );
         }
     }
