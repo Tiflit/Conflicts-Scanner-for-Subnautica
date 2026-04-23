@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace ConflictScanner
 {
-    public class NautilusAnalyzer
+    public class NautilusAnalyzer : IAnalyzer
     {
         private class NautilusEntry
         {
@@ -25,7 +25,6 @@ namespace ConflictScanner
                 return;
             }
 
-            // JSON-based detection (Quick + Deep)
             var idMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             var techTypeMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -69,15 +68,6 @@ namespace ConflictScanner
                     );
                 }
             }
-
-            // Deep Scan: reflection-based Nautilus analysis (future)
-            if (context.Mode == ScanMode.Deep)
-            {
-                context.AddNautilusWarning(
-                    Severity.Info,
-                    "Deep Scan: Reflection-based Nautilus analysis not implemented yet."
-                );
-            }
         }
 
         private void TryParseConfig(
@@ -90,9 +80,6 @@ namespace ConflictScanner
             try
             {
                 string json = File.ReadAllText(filePath);
-
-                // If this JSON isn't a Nautilus config, deserialization may succeed
-                // but Id/TechType will be null and nothing will be registered. That's fine.
 
                 var entries = JsonSerializer.Deserialize<List<NautilusEntry>>(json);
                 if (entries != null)
