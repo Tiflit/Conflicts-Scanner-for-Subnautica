@@ -6,6 +6,10 @@ using System.Reflection;
 
 namespace ConflictScanner.Reflection
 {
+    /// <summary>
+    /// Reflection-based Nautilus analysis for Deep Scan mode.
+    /// Extracts TechType IDs, CraftTree paths, and Sprite keys from Nautilus API calls.
+    /// </summary>
     public class NautilusReflectionAnalyzer
     {
         private readonly Dictionary<string, List<string>> techTypeMap =
@@ -59,12 +63,12 @@ namespace ConflictScanner.Reflection
                     BindingFlags.Static |
                     BindingFlags.Instance))
                 {
-                    AnalyzeMethod(method, modName, context);
+                    AnalyzeMethod(method, modName);
                 }
             }
         }
 
-        private void AnalyzeMethod(MethodInfo method, string modName, ScanContext context)
+        private void AnalyzeMethod(MethodInfo method, string modName)
         {
             foreach (var (target, args) in ILReader.FindCalls(method))
             {
@@ -105,7 +109,7 @@ namespace ConflictScanner.Reflection
                 {
                     context.AddNautilusWarning(
                         Severity.Error,
-                        $"Duplicate TechType detected: \"{pair.Key}\" used by {string.Join(", ", pair.Value)}"
+                        $"Duplicate TechType detected (reflection): \"{pair.Key}\" used by {string.Join(", ", pair.Value)}"
                     );
                 }
             }
@@ -116,7 +120,7 @@ namespace ConflictScanner.Reflection
                 {
                     context.AddNautilusWarning(
                         Severity.Warning,
-                        $"CraftTree conflict: \"{pair.Key}\" added by {string.Join(", ", pair.Value)}"
+                        $"CraftTree conflict (reflection): \"{pair.Key}\" added by {string.Join(", ", pair.Value)}"
                     );
                 }
             }
@@ -127,7 +131,7 @@ namespace ConflictScanner.Reflection
                 {
                     context.AddNautilusWarning(
                         Severity.Warning,
-                        $"Sprite key conflict: \"{pair.Key}\" used by {string.Join(", ", pair.Value)}"
+                        $"Sprite key conflict (reflection): \"{pair.Key}\" used by {string.Join(", ", pair.Value)}"
                     );
                 }
             }
