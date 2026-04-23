@@ -1,4 +1,5 @@
 using System.Text;
+using System.Collections.Generic;
 
 namespace ConflictScanner
 {
@@ -19,14 +20,24 @@ namespace ConflictScanner
             return sb.ToString();
         }
 
-        private static void AppendSection(StringBuilder sb, string title, System.Collections.Generic.List<string> items)
+        private static void AppendSection(
+            StringBuilder sb,
+            string title,
+            List<(Severity Level, string Message)> items)
         {
             sb.AppendLine($"## {title}");
+
             if (items.Count == 0)
+            {
                 sb.AppendLine("No issues detected.");
+            }
             else
-                foreach (var item in items)
-                    sb.AppendLine("- " + item);
+            {
+                foreach (var (level, message) in items)
+                {
+                    sb.AppendLine($"[{level}] {message}");
+                }
+            }
 
             sb.AppendLine();
         }
