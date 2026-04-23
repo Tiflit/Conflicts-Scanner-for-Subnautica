@@ -1,19 +1,31 @@
+using System;
 using System.Collections.Generic;
 
 namespace ConflictScanner
 {
+    public enum ScanMode
+    {
+        Quick,
+        Deep
+    }
+
     public class ScanContext
     {
         public string GamePath { get; }
+        public ScanMode Mode { get; }
+        public TimeSpan ScanDuration { get; set; }
 
         public List<(Severity Level, string Message)> HarmonyWarnings { get; } = new();
         public List<(Severity Level, string Message)> NautilusWarnings { get; } = new();
         public List<(Severity Level, string Message)> QModWarnings { get; } = new();
         public List<(Severity Level, string Message)> FileWarnings { get; } = new();
 
-        public ScanContext(string gamePath)
+        public List<string> Suggestions { get; } = new();
+
+        public ScanContext(string gamePath, ScanMode mode)
         {
             GamePath = gamePath;
+            Mode = mode;
         }
 
         public void AddFileWarning(Severity level, string message)
