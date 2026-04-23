@@ -1,11 +1,7 @@
-using System;
 using System.Reflection;
 
 namespace ConflictScanner.Reflection
 {
-    /// <summary>
-    /// Holds known Nautilus API signatures for reflection-based detection.
-    /// </summary>
     public static class NautilusSignatures
     {
         public static bool IsTechTypeRegistration(MethodInfo method)
