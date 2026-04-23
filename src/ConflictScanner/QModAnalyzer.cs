@@ -21,7 +21,7 @@ namespace ConflictScanner
 
             if (!Directory.Exists(qmodsPath))
             {
-                context.QModWarnings.Add("No QMods folder found.");
+                context.AddQModWarning(Severity.Info, "No QMods folder found.");
                 return;
             }
 
@@ -34,7 +34,10 @@ namespace ConflictScanner
 
                 if (!File.Exists(manifestPath))
                 {
-                    context.QModWarnings.Add($"[{Path.GetFileName(modFolder)}] Missing mod.json.");
+                    context.AddQModWarning(
+                        Severity.Warning,
+                        $"[{Path.GetFileName(modFolder)}] Missing mod.json."
+                    );
                     continue;
                 }
 
@@ -45,7 +48,10 @@ namespace ConflictScanner
 
                     if (manifest == null || string.IsNullOrWhiteSpace(manifest.Id))
                     {
-                        context.QModWarnings.Add($"[{Path.GetFileName(modFolder)}] Invalid or missing mod ID.");
+                        context.AddQModWarning(
+                            Severity.Warning,
+                            $"[{Path.GetFileName(modFolder)}] Invalid or missing mod ID."
+                        );
                         continue;
                     }
 
@@ -58,18 +64,24 @@ namespace ConflictScanner
                 }
                 catch (Exception ex)
                 {
-                    context.QModWarnings.Add($"[{Path.GetFileName(modFolder)}] Failed to parse mod.json: {ex.Message}");
+                    context.AddQModWarning(
+                        Severity.Warning,
+                        $"[{Path.GetFileName(modFolder)}] Failed to parse mod.json: {ex.Message}"
+                    );
                 }
             }
 
-            // Detect duplicate IDs
             foreach (var pair in idCounts)
             {
                 if (pair.Value > 1)
-                    context.QModWarnings.Add($"Duplicate QMod ID detected: \"{pair.Key}\" appears {pair.Value} times.");
+                {
+                    context.AddQModWarning(
+                        Severity.Error,
+                        $"Duplicate QMod ID detected: \"{pair.Key}\" appears {pair.Value} times."
+                    );
+                }
             }
 
-            // Detect missing dependencies
             foreach (var (folder, manifest) in manifests)
             {
                 if (manifest.Dependencies == null)
@@ -77,13 +89,16 @@ namespace ConflictScanner
 
                 foreach (var dep in manifest.Dependencies)
                 {
-                    bool exists = manifests.Exists(m => 
+                    bool exists = manifests.Exists(m =>
                         m.Manifest.Id.Equals(dep, StringComparison.OrdinalIgnoreCase));
 
                     if (!exists)
-                        context.QModWarnings.Add(
+                    {
+                        context.AddQModWarning(
+                            Severity.Warning,
                             $"[{manifest.Id}] Missing dependency: \"{dep}\""
                         );
+                    }
                 }
             }
         }
