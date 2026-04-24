@@ -10,7 +10,7 @@ namespace ConflictScanner.Reflection
     /// Reflection-based Nautilus analysis for Deep Scan mode.
     /// Extracts TechType IDs, CraftTree paths, and Sprite keys from Nautilus API calls.
     /// </summary>
-    public class NautilusReflectionAnalyzer
+    public class NautilusReflectionAnalyzer : IAnalyzer
     {
         private readonly Dictionary<string, List<string>> techTypeMap =
             new(StringComparer.OrdinalIgnoreCase);
