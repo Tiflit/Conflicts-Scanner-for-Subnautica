@@ -2,6 +2,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using ConflictScanner.ViewModels;
 
 namespace ConflictScanner.Views
@@ -18,16 +19,20 @@ namespace ConflictScanner.Views
             if (DataContext is not MainWindowViewModel vm)
                 return;
 
-            var dialog = new OpenFolderDialog
+            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                Title = "Select Subnautica installation folder"
-            };
+                Title = "Select Subnautica installation folder",
+                AllowMultiple = false
+            });
 
-            var result = await dialog.ShowAsync(this);
-            if (!string.IsNullOrWhiteSpace(result) && Directory.Exists(result))
+            if (folders.Count > 0)
             {
-                vm.GamePath = result;
-                vm.Status = "Game path updated.";
+                var path = folders[0].TryGetLocalPath();
+                if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+                {
+                    vm.GamePath = path;
+                    vm.Status = "Game path updated.";
+                }
             }
         }
 
@@ -42,23 +47,25 @@ namespace ConflictScanner.Views
                 return;
             }
 
-            var dialog = new SaveFileDialog
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = "Save scan report",
-                InitialFileName = "ConflictScannerReport.txt"
-            };
-
-            dialog.Filters.Add(new FileDialogFilter
-            {
-                Name = "Text files",
-                Extensions = { "txt" }
+                SuggestedFileName = "ConflictScannerReport.txt",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Text files")
+                    {
+                        Patterns = new[] { "*.txt" }
+                    }
+                }
             });
 
-            var path = await dialog.ShowAsync(this);
-            if (!string.IsNullOrWhiteSpace(path))
+            if (file is not null)
             {
-                await File.WriteAllTextAsync(path, vm.ReportText);
-                vm.Status = $"Report saved to {path}.";
+                await using var stream = await file.OpenWriteAsync();
+                await using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(vm.ReportText);
+                vm.Status = "Report saved.";
             }
         }
     }
