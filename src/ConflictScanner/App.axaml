@@ -1,10 +1,14 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="ConflictScanner.App"
-             RequestedThemeVariant="Dark">
+             xmlns:conv="clr-namespace:ConflictScanner.Converters"
+             x:Class="ConflictScanner.App">
 
   <Application.Styles>
     <FluentTheme />
   </Application.Styles>
+
+  <Application.Resources>
+    <conv:BooleanNegationConverter x:Key="BooleanNegationConverter" />
+  </Application.Resources>
 
 </Application>
