@@ -20,13 +20,13 @@
                Text="{Binding GamePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
       <Button Content="Detect"
               Command="{Binding DetectGameCommand}"
-              IsEnabled="{Binding IsBusy, Converter={x:Static BooleanNegationConverter.Instance}}"/>
+              IsEnabled="True"/>
       <CheckBox Content="Deep scan"
                 IsChecked="{Binding DeepScan}"
                 VerticalAlignment="Center"/>
       <Button Content="Scan"
               Command="{Binding RunScanCommand}"
-              IsEnabled="{Binding IsBusy, Converter={x:Static BooleanNegationConverter.Instance}}"/>
+              IsEnabled="True"/>
     </StackPanel>
 
     <!-- Status -->
