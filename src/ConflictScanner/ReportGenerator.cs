@@ -1,5 +1,5 @@
+using System;
 using System.Text;
-using System.Collections.Generic;
 
 namespace ConflictScanner
 {
@@ -9,18 +9,21 @@ namespace ConflictScanner
         {
             var sb = new StringBuilder();
 
-            sb.AppendLine("=== Subnautica Mod Conflict Report ===");
-            sb.AppendLine();
-            sb.AppendLine($"Scan mode: {context.Mode}");
-            sb.AppendLine($"Duration: {context.ScanDuration.TotalSeconds:F2} seconds");
+            sb.AppendLine("=== Subnautica Conflict Scanner ===");
+            sb.AppendLine($"Game path : {context.GamePath}");
+            sb.AppendLine($"Mode      : {context.Mode}");
+            sb.AppendLine($"Duration  : {context.ScanDuration.TotalSeconds:F1} seconds");
             sb.AppendLine();
 
-            AppendSection(sb, "Harmony Conflicts", context.HarmonyWarnings);
-            AppendSection(sb, "Nautilus Conflicts", context.NautilusWarnings);
-            AppendSection(sb, "QMod Conflicts", context.QModWarnings);
-            AppendSection(sb, "File Conflicts", context.FileWarnings);
+            AppendSection(sb, "Harmony", context.HarmonyWarnings);
+            AppendSection(sb, "Nautilus", context.NautilusWarnings);
+            AppendSection(sb, "SMLHelper", context.SMLHelperWarnings);
+            AppendSection(sb, "QMod", context.QModWarnings);
+            AppendSection(sb, "Files / Overrides", context.FileWarnings);
 
-            AppendSuggestions(sb, context.Suggestions);
+            AppendPatchers(sb, context);
+            AppendSuggestions(sb, context);
+            AppendNotes(sb, context);
 
             return sb.ToString();
         }
@@ -28,42 +31,61 @@ namespace ConflictScanner
         private static void AppendSection(
             StringBuilder sb,
             string title,
-            List<(Severity Level, string Message)> items)
+            System.Collections.Generic.List<(Severity Level, string Message)> warnings)
         {
-            sb.AppendLine($"## {title}");
+            if (warnings.Count == 0)
+                return;
 
-            if (items.Count == 0)
+            sb.AppendLine($"=== {title} ===");
+            foreach (var (level, message) in warnings)
             {
-                sb.AppendLine("No issues detected.");
+                sb.AppendLine($"[{level}] {message}");
+            }
+            sb.AppendLine();
+        }
+
+        private static void AppendPatchers(StringBuilder sb, ScanContext context)
+        {
+            sb.AppendLine("=== BepInEx Patchers ===");
+
+            if (context.Patchers.Count == 0)
+            {
+                sb.AppendLine("No patchers detected.");
             }
             else
             {
-                foreach (var (level, message) in items)
-                {
-                    sb.AppendLine($"[{level}] {message}");
-                }
+                foreach (var p in context.Patchers)
+                    sb.AppendLine($"• {p}");
             }
 
             sb.AppendLine();
         }
 
-        private static void AppendSuggestions(StringBuilder sb, List<string> suggestions)
+        private static void AppendSuggestions(StringBuilder sb, ScanContext context)
         {
-            sb.AppendLine("## Suggestions");
+            if (context.Suggestions.Count == 0)
+                return;
 
-            if (suggestions.Count == 0)
-            {
-                sb.AppendLine("No suggestions available yet.");
-            }
-            else
-            {
-                foreach (var suggestion in suggestions)
-                {
-                    sb.AppendLine($"- {suggestion}");
-                }
-            }
-
+            sb.AppendLine("=== Suggestions ===");
+            foreach (var s in context.Suggestions)
+                sb.AppendLine($"• {s}");
             sb.AppendLine();
+        }
+
+        private static void AppendNotes(StringBuilder sb, ScanContext context)
+        {
+            // Always include reflection limitations note.
+            sb.AppendLine("=== Notes ===");
+            sb.AppendLine("Some Harmony patches and Nautilus registrations may not be detected if they are created dynamically at runtime.");
+            sb.AppendLine("Reflection-based analysis focuses on attribute-based and literal-string usage; highly dynamic mods may not be fully visible.");
+            sb.AppendLine();
+
+            if (context.Notes.Count > 0)
+            {
+                foreach (var note in context.Notes)
+                    sb.AppendLine($"• {note}");
+                sb.AppendLine();
+            }
         }
     }
 }
