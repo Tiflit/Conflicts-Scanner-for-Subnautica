@@ -16,8 +16,10 @@
     <!-- Path + controls -->
     <StackPanel Orientation="Horizontal" Spacing="8">
       <TextBlock Text="Game path:" VerticalAlignment="Center"/>
-      <TextBox Width="500"
+      <TextBox Width="450"
                Text="{Binding GamePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+      <Button Content="Browse..."
+              Click="OnBrowseClick"/>
       <Button Content="Detect"
               Command="{Binding DetectGameCommand}"/>
       <CheckBox Content="Deep scan"
@@ -37,21 +39,40 @@
             BorderBrush="Gray"
             BorderThickness="1"
             CornerRadius="4">
-      <ScrollViewer>
-        <TextBox Text="{Binding ReportText}"
-                 IsReadOnly="True"
-                 AcceptsReturn="True"
-                 TextWrapping="Wrap"
-                 FontFamily="Consolas"
-                 Background="Transparent"
-                 BorderThickness="0"/>
-      </ScrollViewer>
+      <Grid>
+        <ScrollViewer>
+          <TextBox Text="{Binding ReportText}"
+                   IsReadOnly="True"
+                   AcceptsReturn="True"
+                   TextWrapping="Wrap"
+                   FontFamily="Consolas"
+                   Background="Transparent"
+                   BorderThickness="0"/>
+        </ScrollViewer>
+
+        <!-- Simple scanning overlay -->
+        <Border Background="#80000000"
+                IsVisible="{Binding IsBusy}">
+          <StackPanel HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Spacing="8">
+            <TextBlock Text="Scanning..."
+                       FontSize="18"
+                       HorizontalAlignment="Center"/>
+          </StackPanel>
+        </Border>
+      </Grid>
     </Border>
 
     <!-- Footer -->
-    <TextBlock Grid.Row="3"
-               HorizontalAlignment="Right"
-               Opacity="0.6"
-               Text="ConflictScanner — prototype build"/>
+    <StackPanel Grid.Row="3"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button Content="Save report..."
+              Click="OnSaveReportClick"/>
+      <TextBlock Opacity="0.6"
+                 Text="ConflictScanner — v0.0.0"/>
+    </StackPanel>
   </Grid>
 </Window>
