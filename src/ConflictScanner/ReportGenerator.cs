@@ -1,4 +1,3 @@
-using System;
 using System.Text;
 
 namespace ConflictScanner
@@ -9,7 +8,7 @@ namespace ConflictScanner
         {
             var sb = new StringBuilder();
 
-            sb.AppendLine("=== Subnautica Conflict Scanner ===");
+            sb.AppendLine($"=== {context.GameName} Conflict Scanner ===");
             sb.AppendLine($"Game path : {context.GamePath}");
             sb.AppendLine($"Mode      : {context.Mode}");
             sb.AppendLine($"Duration  : {context.ScanDuration.TotalSeconds:F1} seconds");
@@ -74,7 +73,6 @@ namespace ConflictScanner
 
         private static void AppendNotes(StringBuilder sb, ScanContext context)
         {
-            // Always include reflection limitations note.
             sb.AppendLine("=== Notes ===");
             sb.AppendLine("Some Harmony patches and Nautilus registrations may not be detected if they are created dynamically at runtime.");
             sb.AppendLine("Reflection-based analysis focuses on attribute-based and literal-string usage; highly dynamic mods may not be fully visible.");
