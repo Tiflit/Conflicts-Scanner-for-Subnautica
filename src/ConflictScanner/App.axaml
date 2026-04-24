@@ -9,6 +9,8 @@
 
   <Application.Resources>
     <conv:BooleanNegationConverter x:Key="BooleanNegationConverter" />
+    <!-- Overlay brush for scan in progress -->
+    <SolidColorBrush x:Key="ScanOverlayBrush" Color="#CC1A1A1A" />
   </Application.Resources>
 
 </Application>
