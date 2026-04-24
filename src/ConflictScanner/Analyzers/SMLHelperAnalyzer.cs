@@ -27,17 +27,11 @@ namespace ConflictScanner
             {
                 string fileName = Path.GetFileName(dll);
 
-                if (fileName.Equals("SMLHelper.dll", StringComparison.OrdinalIgnoreCase) ||
-                    fileName.Contains("SMLHelper", StringComparison.OrdinalIgnoreCase))
-                {
+                if (fileName.Equals("SMLHelper.dll", StringComparison.OrdinalIgnoreCase))
                     hasSml = true;
-                }
 
-                if (fileName.Equals("Nautilus.dll", StringComparison.OrdinalIgnoreCase) ||
-                    fileName.Contains("Nautilus", StringComparison.OrdinalIgnoreCase))
-                {
+                if (fileName.Equals("Nautilus.dll", StringComparison.OrdinalIgnoreCase))
                     hasNautilus = true;
-                }
             }
 
             if (!hasSml && !hasNautilus)
