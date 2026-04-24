@@ -21,7 +21,7 @@ namespace ConflictScanner.Reflection
             var module = method.Module;
 
             int index = 0;
-            string lastString = null;
+            string? lastString = null;
 
             while (index < il.Length)
             {
@@ -42,7 +42,7 @@ namespace ConflictScanner.Reflection
                 else if (op == OpCodes.Call || op == OpCodes.Callvirt)
                 {
                     int token = ReadInt32(il, ref index);
-                    MethodInfo target = null;
+                    MethodInfo? target = null;
 
                     try
                     {
@@ -100,6 +100,7 @@ namespace ConflictScanner.Reflection
                 case OperandType.ShortInlineBrTarget:
                 case OperandType.ShortInlineI:
                 case OperandType.ShortInlineVar:
+                case OperandType.ShortInlineR:
                     index += 1;
                     return;
 
@@ -115,11 +116,11 @@ namespace ConflictScanner.Reflection
                 case OperandType.InlineString:
                 case OperandType.InlineTok:
                 case OperandType.InlineType:
+                case OperandType.InlineR:
                     index += 4;
                     return;
 
                 case OperandType.InlineI8:
-                case OperandType.InlineR8:
                     index += 8;
                     return;
 
