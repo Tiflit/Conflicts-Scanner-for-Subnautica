@@ -44,19 +44,16 @@
             BorderThickness="1"
             CornerRadius="4">
       <Grid>
-        <ScrollViewer>
-          <TextBox Text="{Binding ReportText}"
-                   IsReadOnly="True"
-                   AcceptsReturn="True"
-                   TextWrapping="Wrap"
-                   FontFamily="Consolas"
-                   Background="Transparent"
-                   BorderThickness="0"/>
-        </ScrollViewer>
+        <TextBox Text="{Binding ReportText}"
+                 IsReadOnly="True"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 FontFamily="Consolas"
+                 Background="Transparent"
+                 BorderThickness="0"/>
 
         <!-- Scanning overlay -->
-        <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
-                Opacity="0.85"
+        <Border Background="{DynamicResource ScanOverlayBrush}"
                 IsVisible="{Binding IsBusy}">
           <StackPanel HorizontalAlignment="Center"
                       VerticalAlignment="Center"
