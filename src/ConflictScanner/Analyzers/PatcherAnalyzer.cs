@@ -26,10 +26,7 @@ namespace ConflictScanner
 
             if (!Directory.Exists(patchersPath))
             {
-                context.AddFileWarning(
-                    Severity.Info,
-                    "No BepInEx/patchers folder found."
-                );
+                // No patchers folder is fine; no warning needed beyond this.
                 return;
             }
 
@@ -41,20 +38,15 @@ namespace ConflictScanner
                                      .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                                      .Replace('\\', '/');
                 patcherDlls.Add(relative);
+                context.AddPatcher(relative);
             }
 
             if (patcherDlls.Count == 0)
-            {
-                context.AddFileWarning(
-                    Severity.Info,
-                    "BepInEx/patchers exists but contains no DLLs."
-                );
                 return;
-            }
 
             context.AddFileWarning(
                 Severity.Warning,
-                $"Detected {patcherDlls.Count} patcher(s) in BepInEx/patchers: {string.Join(", ", patcherDlls)}"
+                $"Detected {patcherDlls.Count} patcher(s) in BepInEx/patchers."
             );
         }
     }
