@@ -19,14 +19,12 @@
       <TextBox Width="500"
                Text="{Binding GamePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
       <Button Content="Detect"
-              Command="{Binding DetectGameCommand}"
-              IsEnabled="True"/>
+              Command="{Binding DetectGameCommand}"/>
       <CheckBox Content="Deep scan"
                 IsChecked="{Binding DeepScan}"
                 VerticalAlignment="Center"/>
       <Button Content="Scan"
-              Command="{Binding RunScanCommand}"
-              IsEnabled="True"/>
+              Command="{Binding RunScanCommand}"/>
     </StackPanel>
 
     <!-- Status -->
