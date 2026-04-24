@@ -45,18 +45,12 @@ namespace ConflictScanner
 
         private static void AppendPatchers(StringBuilder sb, ScanContext context)
         {
-            sb.AppendLine("=== BepInEx Patchers ===");
-
             if (context.Patchers.Count == 0)
-            {
-                sb.AppendLine("No patchers detected.");
-            }
-            else
-            {
-                foreach (var p in context.Patchers)
-                    sb.AppendLine($"• {p}");
-            }
+                return;
 
+            sb.AppendLine("=== BepInEx Patchers ===");
+            foreach (var p in context.Patchers)
+                sb.AppendLine($"• {p}");
             sb.AppendLine();
         }
 
@@ -78,6 +72,7 @@ namespace ConflictScanner
             sb.AppendLine("Reflection-based analysis focuses on attribute-based and literal-string usage; highly dynamic mods may not be fully visible.");
             sb.AppendLine();
 
+            // Currently no analyzers populate context.Notes; this is reserved for future, more detailed hints.
             if (context.Notes.Count > 0)
             {
                 foreach (var note in context.Notes)
