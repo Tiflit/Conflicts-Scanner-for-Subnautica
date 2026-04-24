@@ -4,14 +4,14 @@ namespace ConflictScanner.Profiles
 {
     public static class ProfileManager
     {
-        private static readonly List<GameProfile> Profiles = new()
+        private static readonly List<GameProfile> profiles = new()
         {
             new Subnautica()
         };
 
-        public static GameProfile DetectProfile(string gamePath)
+        public static GameProfile? DetectProfile(string gamePath)
         {
-            foreach (var profile in Profiles)
+            foreach (var profile in profiles)
             {
                 if (profile.MatchesGame(gamePath))
                     return profile;
