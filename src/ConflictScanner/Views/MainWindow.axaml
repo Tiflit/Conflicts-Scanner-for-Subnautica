@@ -19,14 +19,18 @@
       <TextBox Width="450"
                Text="{Binding GamePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
       <Button Content="Browse..."
-              Click="OnBrowseClick"/>
+              Click="OnBrowseClick"
+              IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanNegationConverter}}"/>
       <Button Content="Detect"
-              Command="{Binding DetectGameCommand}"/>
+              Command="{Binding DetectGameCommand}"
+              IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanNegationConverter}}"/>
       <CheckBox Content="Deep scan"
                 IsChecked="{Binding DeepScan}"
-                VerticalAlignment="Center"/>
+                VerticalAlignment="Center"
+                IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanNegationConverter}}"/>
       <Button Content="Scan"
-              Command="{Binding RunScanCommand}"/>
+              Command="{Binding RunScanCommand}"
+              IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanNegationConverter}}"/>
     </StackPanel>
 
     <!-- Status -->
@@ -36,7 +40,7 @@
 
     <!-- Report -->
     <Border Grid.Row="2"
-            BorderBrush="Gray"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
             BorderThickness="1"
             CornerRadius="4">
       <Grid>
@@ -50,8 +54,9 @@
                    BorderThickness="0"/>
         </ScrollViewer>
 
-        <!-- Simple scanning overlay -->
-        <Border Background="#80000000"
+        <!-- Scanning overlay -->
+        <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                Opacity="0.85"
                 IsVisible="{Binding IsBusy}">
           <StackPanel HorizontalAlignment="Center"
                       VerticalAlignment="Center"
@@ -70,7 +75,8 @@
                 HorizontalAlignment="Right"
                 Spacing="8">
       <Button Content="Save report..."
-              Click="OnSaveReportClick"/>
+              Click="OnSaveReportClick"
+              IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanNegationConverter}}"/>
       <TextBlock Opacity="0.6"
                  Text="ConflictScanner — v0.0.0"/>
     </StackPanel>
