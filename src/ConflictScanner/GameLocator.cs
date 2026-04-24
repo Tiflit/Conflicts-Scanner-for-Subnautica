@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Microsoft.Win32;
 using System.Text.Json;
+using Microsoft.Win32;
 
 namespace ConflictScanner
 {
@@ -50,17 +50,17 @@ namespace ConflictScanner
             }
             catch
             {
-                // Swallow errors; settings are non-critical.
+                // Non-critical.
             }
         }
 
         public static bool TryAutoLocateSubnautica(out string? path)
         {
-            // 1. Try Steam
+            // 1. Try Steam (Windows only)
             if (TryFindSteamSubnautica(out path))
                 return true;
 
-            // 2. TODO: Epic detection could be added here later.
+            // 2. TODO: Epic detection later.
 
             path = null;
             return false;
@@ -69,6 +69,9 @@ namespace ConflictScanner
         private static bool TryFindSteamSubnautica(out string? path)
         {
             path = null;
+
+            if (!OperatingSystem.IsWindows())
+                return false;
 
             try
             {
@@ -127,7 +130,6 @@ namespace ConflictScanner
                     if (parts.Length < 2)
                         continue;
 
-                    // Example: "1" "D:\\SteamLibrary"
                     string value = parts[^1];
                     if (Directory.Exists(value))
                         result.Add(value);
@@ -135,7 +137,6 @@ namespace ConflictScanner
             }
             catch
             {
-                // Ignore parse errors.
             }
 
             return result;
@@ -161,7 +162,6 @@ namespace ConflictScanner
             }
             catch
             {
-                // Ignore parse errors.
             }
 
             return null;
