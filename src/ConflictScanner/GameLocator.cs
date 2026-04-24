@@ -56,11 +56,8 @@ namespace ConflictScanner
 
         public static bool TryAutoLocateSubnautica(out string? path)
         {
-            // 1. Try Steam (Windows only)
             if (TryFindSteamSubnautica(out path))
                 return true;
-
-            // 2. TODO: Epic detection later.
 
             path = null;
             return false;
@@ -107,7 +104,6 @@ namespace ConflictScanner
             }
             catch
             {
-                // Ignore and fall back.
             }
 
             return false;
@@ -120,6 +116,14 @@ namespace ConflictScanner
             try
             {
                 string[] lines = File.ReadAllLines(vdfPath);
+
+                // NOTE:
+                // This parser intentionally takes the last quoted token on each line
+                // and filters it through Directory.Exists. On modern Steam VDFs,
+                // this picks up "path" "D:\SteamLibrary" entries while ignoring
+                // numeric app IDs like "264710" "1234567890" (which are not directories).
+                // It is fragile but functional; be careful "improving" it without
+                // testing against real VDF samples.
                 foreach (var line in lines)
                 {
                     string trimmed = line.Trim();
