@@ -37,6 +37,9 @@ namespace ConflictScanner.ViewModels
         [RelayCommand]
         private void DetectGame()
         {
+            if (IsBusy)
+                return;
+
             if (GameLocator.TryAutoLocateSubnautica(out var path) && !string.IsNullOrWhiteSpace(path))
             {
                 GamePath = path;
@@ -76,7 +79,7 @@ namespace ConflictScanner.ViewModels
                 }
 
                 var mode = DeepScan ? ScanMode.Deep : ScanMode.Quick;
-                var context = new ScanContext(GamePath, mode);
+                var context = new ScanContext(GamePath, mode, profile.GameName);
                 var pipeline = new AnalyzerPipeline();
                 profile.RegisterAnalyzers(pipeline);
 
