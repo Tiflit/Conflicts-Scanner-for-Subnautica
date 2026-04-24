@@ -12,28 +12,25 @@ namespace ConflictScanner
     public class ScanContext
     {
         public string GamePath { get; }
+        public string GameName { get; }
         public ScanMode Mode { get; }
         public TimeSpan ScanDuration { get; set; }
 
-        // Per-system warning lists.
         public List<(Severity Level, string Message)> SMLHelperWarnings { get; } = new();
         public List<(Severity Level, string Message)> HarmonyWarnings    { get; } = new();
         public List<(Severity Level, string Message)> NautilusWarnings   { get; } = new();
         public List<(Severity Level, string Message)> QModWarnings       { get; } = new();
         public List<(Severity Level, string Message)> FileWarnings       { get; } = new();
 
-        // Detected BepInEx patchers (file names / relative paths).
         public List<string> Patchers { get; } = new();
-
-        // General notes to surface in the report.
         public List<string> Notes { get; } = new();
-
         public List<string> Suggestions { get; } = new();
 
-        public ScanContext(string gamePath, ScanMode mode)
+        public ScanContext(string gamePath, ScanMode mode, string gameName)
         {
             GamePath = gamePath;
             Mode = mode;
+            GameName = gameName;
         }
 
         public void AddSMLHelperWarning(Severity level, string message) =>
