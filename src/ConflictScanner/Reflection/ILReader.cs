@@ -100,14 +100,10 @@ namespace ConflictScanner.Reflection
                 case OperandType.ShortInlineBrTarget:
                 case OperandType.ShortInlineI:
                 case OperandType.ShortInlineVar:
-                case OperandType.ShortInlineR:
                     index += 1;
                     return;
 
-                case OperandType.InlineVar:
-                    index += 2;
-                    return;
-
+                case OperandType.ShortInlineR: // float32
                 case OperandType.InlineI:
                 case OperandType.InlineBrTarget:
                 case OperandType.InlineField:
@@ -116,11 +112,11 @@ namespace ConflictScanner.Reflection
                 case OperandType.InlineString:
                 case OperandType.InlineTok:
                 case OperandType.InlineType:
-                case OperandType.InlineR:
                     index += 4;
                     return;
 
                 case OperandType.InlineI8:
+                case OperandType.InlineR: // float64
                     index += 8;
                     return;
 
