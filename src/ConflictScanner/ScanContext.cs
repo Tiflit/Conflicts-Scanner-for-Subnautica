@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ConflictScanner.Profiles;
 
 namespace ConflictScanner
 {
@@ -15,6 +16,7 @@ namespace ConflictScanner
         public string GameName { get; }
         public ScanMode Mode { get; }
         public TimeSpan ScanDuration { get; set; }
+        public GameEnvironmentInfo Environment { get; set; }
 
         public List<Finding> Findings { get; } = new();
 
@@ -33,6 +35,7 @@ namespace ConflictScanner
             GamePath = gamePath;
             Mode = mode;
             GameName = gameName;
+            Environment = GameEnvironmentDetector.Detect(gamePath);
         }
 
         public void AddFinding(Finding finding) =>

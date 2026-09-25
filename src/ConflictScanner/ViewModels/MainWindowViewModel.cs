@@ -50,7 +50,7 @@ namespace ConflictScanner.ViewModels
 
         public IReadOnlyList<string> AvailableCategories { get; } = new[]
         {
-            "All", "Metadata", "Harmony", "Nautilus", "Filesystem", "SMLHelper", "QMod"
+            "All", "Metadata", "Dependencies", "Compatibility", "Harmony", "Nautilus", "Filesystem", "SMLHelper", "QMod"
         };
 
         public IReadOnlyList<string> AvailableImpacts { get; } = new[]

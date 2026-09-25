@@ -32,11 +32,35 @@ namespace ConflictScanner
                 );
             }
 
-            bool hasMissingDeps = findings.Any(f => f.Category == "Metadata" && f.Explanation.Contains("Missing required dependency"));
+            bool hasCircularDeps = findings.Any(f => f.Category == "Dependencies" && f.Impact == Impact.Critical);
+            if (hasCircularDeps)
+            {
+                context.Suggestions.Add(
+                    "CIRCULAR DEPENDENCY: A cyclic dependency loop exists between plugins. BepInEx cannot determine load order and will fail to load these mods."
+                );
+            }
+
+            bool hasMissingDeps = findings.Any(f => f.Category == "Metadata" && f.Explanation.Contains("Missing"));
             if (hasMissingDeps)
             {
                 context.Suggestions.Add(
-                    "MISSING DEPENDENCIES: One or more mods declare missing required dependencies. Check the findings list and install the required prerequisites."
+                    "MISSING DEPENDENCIES: One or more mods declare missing dependencies. Check the findings list and install the required prerequisites."
+                );
+            }
+
+            bool hasBranchIncompatibility = findings.Any(f => f.Category == "Compatibility" && f.ResourceKey == "QMods_On_Modern_Branch");
+            if (hasBranchIncompatibility)
+            {
+                context.Suggestions.Add(
+                    "BRANCH INCOMPATIBILITY: QMods cannot run on Subnautica 2.0+ (Living Large). Remove legacy QMods and install BepInEx/Nautilus equivalents, or revert to the Steam legacy branch."
+                );
+            }
+
+            bool hasDualLoaders = findings.Any(f => f.Category == "Compatibility" && f.ResourceKey == "Dual_Mod_Loaders_Detected");
+            if (hasDualLoaders)
+            {
+                context.Suggestions.Add(
+                    "DUAL LOADERS: Both BepInEx and QModManager are installed. Having two active mod loaders causes crashes and duplicate patches; remove the unused loader."
                 );
             }
 
@@ -64,7 +88,7 @@ namespace ConflictScanner
                 );
             }
 
-            if (context.QModWarnings.Count > 0)
+            if (context.QModWarnings.Count > 0 && !hasBranchIncompatibility && !hasDualLoaders)
             {
                 context.Suggestions.Add(
                     "LEGACY QMODS: QModManager mods detected. Modern Subnautica uses BepInEx. Legacy QMods will not load unless you are running the legacy game branch."
