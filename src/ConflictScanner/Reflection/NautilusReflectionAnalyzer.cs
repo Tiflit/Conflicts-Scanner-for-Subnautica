@@ -26,6 +26,10 @@ namespace ConflictScanner.Reflection
             if (context.Mode == ScanMode.Quick)
                 return;
 
+            techTypeMap.Clear();
+            craftTreeMap.Clear();
+            spriteMap.Clear();
+
             string bepPath = Path.Combine(context.GamePath, "BepInEx", "plugins");
             if (!Directory.Exists(bepPath))
                 return;
@@ -45,7 +49,7 @@ namespace ConflictScanner.Reflection
 
         private void AnalyzeAssembly(string dllPath, string modName, ScanContext context)
         {
-            Assembly asm = ReflectionUtils.LoadAssemblySafe(dllPath);
+            Assembly? asm = ReflectionUtils.LoadAssemblySafe(dllPath);
             if (asm == null)
             {
                 context.AddNautilusWarning(
@@ -55,15 +59,50 @@ namespace ConflictScanner.Reflection
                 return;
             }
 
-            foreach (var type in asm.GetTypes())
+            IEnumerable<Type> types;
+            try
             {
-                foreach (var method in type.GetMethods(
-                    BindingFlags.Public |
-                    BindingFlags.NonPublic |
-                    BindingFlags.Static |
-                    BindingFlags.Instance))
+                types = asm.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                types = ex.Types.Where(t => t != null)!;
+            }
+            catch (Exception ex)
+            {
+                context.AddNautilusWarning(
+                    Severity.Info,
+                    $"[{modName}] Could not inspect types in {Path.GetFileName(dllPath)}: {ex.Message}"
+                );
+                return;
+            }
+
+            foreach (var type in types)
+            {
+                MethodInfo[] methods;
+                try
                 {
-                    AnalyzeMethod(method, modName);
+                    methods = type.GetMethods(
+                        BindingFlags.Public |
+                        BindingFlags.NonPublic |
+                        BindingFlags.Static |
+                        BindingFlags.Instance);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (var method in methods)
+                {
+                    try
+                    {
+                        AnalyzeMethod(method, modName);
+                    }
+                    catch
+                    {
+                        // Resilient against individual method parse failures
+                    }
                 }
             }
         }
@@ -74,20 +113,23 @@ namespace ConflictScanner.Reflection
             {
                 if (NautilusSignatures.IsTechTypeRegistration(target))
                 {
-                    string id = args.FirstOrDefault() as string ?? "(unknown)";
-                    Register(techTypeMap, id, modName);
+                    string? id = args.FirstOrDefault() as string;
+                    if (!string.IsNullOrWhiteSpace(id) && id != "(unknown)")
+                        Register(techTypeMap, id, modName);
                 }
 
                 if (NautilusSignatures.IsCraftTreeRegistration(target))
                 {
-                    string path = args.FirstOrDefault() as string ?? "(unknown)";
-                    Register(craftTreeMap, path, modName);
+                    string? path = args.FirstOrDefault() as string;
+                    if (!string.IsNullOrWhiteSpace(path) && path != "(unknown)")
+                        Register(craftTreeMap, path, modName);
                 }
 
                 if (NautilusSignatures.IsSpriteRegistration(target))
                 {
-                    string key = args.FirstOrDefault() as string ?? "(unknown)";
-                    Register(spriteMap, key, modName);
+                    string? key = args.FirstOrDefault() as string;
+                    if (!string.IsNullOrWhiteSpace(key) && key != "(unknown)")
+                        Register(spriteMap, key, modName);
                 }
             }
         }

@@ -3,8 +3,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:ConflictScanner.ViewModels"
+        xmlns:cs="clr-namespace:ConflictScanner"
         x:Class="ConflictScanner.Views.MainWindow"
-        Width="900" Height="600"
+        Width="950" Height="650"
         Title="Subnautica Conflict Scanner"
         mc:Ignorable="d">
 
@@ -38,19 +39,81 @@
                Margin="0,8,0,4"
                Text="{Binding Status}"/>
 
-    <!-- Report -->
+    <!-- Report Area -->
     <Border Grid.Row="2"
             BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}"
             BorderThickness="1"
             CornerRadius="4">
       <Grid>
-        <TextBox Text="{Binding ReportText}"
-                 IsReadOnly="True"
-                 AcceptsReturn="True"
-                 TextWrapping="Wrap"
-                 FontFamily="Consolas"
-                 Background="Transparent"
-                 BorderThickness="0"/>
+        <TabControl Margin="4">
+          <!-- Structured Findings Tab -->
+          <TabItem Header="Findings">
+            <ListBox ItemsSource="{Binding Findings}" Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="cs:Finding">
+                  <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                          BorderThickness="1"
+                          CornerRadius="4"
+                          Padding="8"
+                          Margin="0,2,0,4">
+                    <StackPanel Spacing="4">
+                      <!-- Badge Row -->
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Background="{DynamicResource SystemControlHighlightAccentBrush}"
+                                CornerRadius="3"
+                                Padding="4,2">
+                          <TextBlock Text="{Binding Impact}"
+                                     FontSize="11"
+                                     FontWeight="Bold"
+                                     Foreground="White"/>
+                        </Border>
+                        <Border Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}"
+                                CornerRadius="3"
+                                Padding="4,2">
+                          <TextBlock Text="{Binding Confidence}"
+                                     FontSize="11"
+                                     Opacity="0.85"/>
+                        </Border>
+                        <TextBlock Text="{Binding Category}"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                      </StackPanel>
+
+                      <!-- Description -->
+                      <TextBlock Text="{Binding Explanation}"
+                                 FontWeight="SemiBold"
+                                 TextWrapping="Wrap"/>
+
+                      <!-- Evidence / Action -->
+                      <TextBlock Text="{Binding Evidence}"
+                                 Opacity="0.75"
+                                 FontSize="12"
+                                 TextWrapping="Wrap"/>
+
+                      <TextBlock Text="{Binding SuggestedAction, StringFormat='Recommendation: {0}'}"
+                                 IsVisible="{Binding SuggestedAction, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                 FontStyle="Italic"
+                                 Opacity="0.85"
+                                 FontSize="12"
+                                 TextWrapping="Wrap"/>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </TabItem>
+
+          <!-- Raw Report Text Tab -->
+          <TabItem Header="Raw Report">
+            <TextBox Text="{Binding ReportText}"
+                     IsReadOnly="True"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     FontFamily="Consolas"
+                     Background="Transparent"
+                     BorderThickness="0"/>
+          </TabItem>
+        </TabControl>
 
         <!-- Scanning overlay -->
         <Border Background="{DynamicResource ScanOverlayBrush}"
@@ -70,12 +133,14 @@
     <StackPanel Grid.Row="3"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8">
+                Spacing="8"
+                Margin="0,8,0,0">
       <Button Content="Save report..."
               Click="OnSaveReportClick"
               IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanNegationConverter}}"/>
       <TextBlock Opacity="0.6"
-                 Text="ConflictScanner — v0.0.0"/>
+                 VerticalAlignment="Center"
+                 Text="ConflictScanner — v0.1.0"/>
     </StackPanel>
   </Grid>
 </Window>

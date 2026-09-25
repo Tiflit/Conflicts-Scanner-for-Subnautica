@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -23,6 +24,11 @@ namespace ConflictScanner.ViewModels
 
         [ObservableProperty]
         private bool _deepScan;
+
+        [ObservableProperty]
+        private int _findingsCount;
+
+        public ObservableCollection<Finding> Findings { get; } = new();
 
         public MainWindowViewModel()
         {
@@ -67,6 +73,8 @@ namespace ConflictScanner.ViewModels
             IsBusy = true;
             Status = "Scanning...";
             ReportText = string.Empty;
+            Findings.Clear();
+            FindingsCount = 0;
 
             try
             {
@@ -96,9 +104,15 @@ namespace ConflictScanner.ViewModels
                     context.ScanDuration = DateTime.UtcNow - start;
                 });
 
+                foreach (var finding in context.Findings)
+                {
+                    Findings.Add(finding);
+                }
+                FindingsCount = Findings.Count;
+
                 var report = ReportGenerator.Generate(context);
                 ReportText = report;
-                Status = $"Scan complete in {context.ScanDuration.TotalSeconds:F1} seconds.";
+                Status = $"Scan complete in {context.ScanDuration.TotalSeconds:F1} seconds. Found {FindingsCount} finding(s).";
 
                 GameLocator.SavePath(GamePath);
             }

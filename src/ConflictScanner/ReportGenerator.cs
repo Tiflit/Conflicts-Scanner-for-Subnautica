@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 
 namespace ConflictScanner
@@ -12,35 +13,29 @@ namespace ConflictScanner
             sb.AppendLine($"Game path : {context.GamePath}");
             sb.AppendLine($"Mode      : {context.Mode}");
             sb.AppendLine($"Duration  : {context.ScanDuration.TotalSeconds:F1} seconds");
+            sb.AppendLine($"Findings  : {context.Findings.Count}");
             sb.AppendLine();
 
-            AppendSection(sb, "Harmony", context.HarmonyWarnings);
-            AppendSection(sb, "Nautilus", context.NautilusWarnings);
-            AppendSection(sb, "SMLHelper", context.SMLHelperWarnings);
-            AppendSection(sb, "QMod", context.QModWarnings);
-            AppendSection(sb, "Files / Overrides", context.FileWarnings);
+            var categories = new[] { "Harmony", "Nautilus", "SMLHelper", "QMod", "Filesystem" };
+            foreach (var cat in categories)
+            {
+                var categoryFindings = context.Findings.FindAll(f => f.Category.Equals(cat, StringComparison.OrdinalIgnoreCase));
+                if (categoryFindings.Count == 0)
+                    continue;
+
+                sb.AppendLine($"=== {cat} ===");
+                foreach (var finding in categoryFindings)
+                {
+                    sb.AppendLine($"[{finding.Impact} | {finding.Confidence}] {finding.Explanation}");
+                }
+                sb.AppendLine();
+            }
 
             AppendPatchers(sb, context);
             AppendSuggestions(sb, context);
             AppendNotes(sb, context);
 
             return sb.ToString();
-        }
-
-        private static void AppendSection(
-            StringBuilder sb,
-            string title,
-            System.Collections.Generic.List<(Severity Level, string Message)> warnings)
-        {
-            if (warnings.Count == 0)
-                return;
-
-            sb.AppendLine($"=== {title} ===");
-            foreach (var (level, message) in warnings)
-            {
-                sb.AppendLine($"[{level}] {message}");
-            }
-            sb.AppendLine();
         }
 
         private static void AppendPatchers(StringBuilder sb, ScanContext context)
@@ -69,10 +64,9 @@ namespace ConflictScanner
         {
             sb.AppendLine("=== Notes ===");
             sb.AppendLine("Some Harmony patches and Nautilus registrations may not be detected if they are created dynamically at runtime.");
-            sb.AppendLine("Reflection-based analysis focuses on attribute-based and literal-string usage; highly dynamic mods may not be fully visible.");
+            sb.AppendLine("Static and reflection-based analysis focuses on attribute-based and literal declarations; highly dynamic mods may not be fully visible.");
             sb.AppendLine();
 
-            // Currently no analyzers populate context.Notes; this is reserved for future, more detailed hints.
             if (context.Notes.Count > 0)
             {
                 foreach (var note in context.Notes)

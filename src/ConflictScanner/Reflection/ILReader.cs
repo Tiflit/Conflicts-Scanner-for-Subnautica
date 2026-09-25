@@ -103,6 +103,10 @@ namespace ConflictScanner.Reflection
                     index += 1;
                     return;
 
+                case OperandType.InlineVar:
+                    index += 2;
+                    return;
+
                 case OperandType.ShortInlineR: // float32
                 case OperandType.InlineI:
                 case OperandType.InlineBrTarget:

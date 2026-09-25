@@ -20,10 +20,13 @@ jobs:
         dotnet-version: 8.0.x
 
     - name: Restore dependencies
-      run: dotnet restore ./src/ConflictScanner/ConflictScanner.csproj
+      run: dotnet restore ConflictScanner.sln
 
     - name: Build
-      run: dotnet build ./src/ConflictScanner/ConflictScanner.csproj --configuration Release --no-restore
+      run: dotnet build ConflictScanner.sln --configuration Release --no-restore
+
+    - name: Run Tests
+      run: dotnet test ConflictScanner.sln --configuration Release --no-build --verbosity normal
 
     - name: Publish (self-contained)
       run: dotnet publish ./src/ConflictScanner/ConflictScanner.csproj -c Release -r win-x64 --self-contained true -o ./publish

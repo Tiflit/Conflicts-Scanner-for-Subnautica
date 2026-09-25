@@ -12,28 +12,34 @@ namespace ConflictScanner
 
         public void Run(ScanContext context)
         {
-            var pathMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            var assemblyMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             var hashMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            var modFolderNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            string bepPath = Path.Combine(context.GamePath, "BepInEx", "plugins");
-            if (Directory.Exists(bepPath))
-                ScanModFolder(bepPath, pathMap, hashMap, context);
+            string bepPlugins = Path.Combine(context.GamePath, "BepInEx", "plugins");
+            if (Directory.Exists(bepPlugins))
+                ScanModFolder(bepPlugins, assemblyMap, hashMap, modFolderNames, context);
 
             string qmodsPath = Path.Combine(context.GamePath, "QMods");
             if (Directory.Exists(qmodsPath))
-                ScanModFolder(qmodsPath, pathMap, hashMap, context);
+                ScanModFolder(qmodsPath, assemblyMap, hashMap, modFolderNames, context);
 
-            foreach (var pair in pathMap)
+            // Check for loose root plugins vs mod folders
+            CheckLoosePlugins(bepPlugins, modFolderNames, context);
+
+            // Check for shared assembly filename collisions across different mod folders
+            foreach (var (dllName, mods) in assemblyMap)
             {
-                if (pair.Value.Count > 1)
+                if (mods.Count > 1)
                 {
                     context.AddFileWarning(
-                        Severity.Error,
-                        $"Path conflict: \"{pair.Key}\" appears in multiple mods: {string.Join(", ", pair.Value)}"
+                        Severity.Warning,
+                        $"Assembly collision: \"{dllName}\" is bundled by multiple mods ({string.Join(", ", mods)}). The game loader may load an unexpected version."
                     );
                 }
             }
 
+            // Check for duplicate identical content (Informational in Deep mode)
             if (context.Mode == ScanMode.Deep)
             {
                 foreach (var pair in hashMap)
@@ -41,8 +47,8 @@ namespace ConflictScanner
                     if (pair.Value.Count > 1)
                     {
                         context.AddFileWarning(
-                            Severity.Warning,
-                            $"Duplicate content detected (hash {pair.Key.Substring(0, 12)}…): used by mods: {string.Join(", ", pair.Value)}"
+                            Severity.Info,
+                            $"Identical content shared (hash {pair.Key.Substring(0, 12)}…): {string.Join(", ", pair.Value)}"
                         );
                     }
                 }
@@ -51,79 +57,132 @@ namespace ConflictScanner
 
         private void ScanModFolder(
             string root,
-            Dictionary<string, List<string>> pathMap,
+            Dictionary<string, List<string>> assemblyMap,
             Dictionary<string, List<string>> hashMap,
+            HashSet<string> modFolderNames,
             ScanContext context)
         {
             foreach (var modFolder in Directory.GetDirectories(root))
             {
                 string modName = Path.GetFileName(modFolder);
 
+                if (!modFolderNames.Add(modName))
+                {
+                    context.AddFileWarning(
+                        Severity.Error,
+                        $"Duplicate mod folder detected: \"{modName}\" exists in multiple locations."
+                    );
+                }
+
                 foreach (var file in Directory.GetFiles(modFolder, "*", SearchOption.AllDirectories))
                 {
+                    string fileName = Path.GetFileName(file);
                     string relative = file.Substring(modFolder.Length)
                                           .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                                           .Replace('\\', '/');
 
-                    if (relative.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
                     if (IgnoreList.ShouldIgnore(relative))
                         continue;
 
+                    // Track bundled DLL assemblies across mods
+                    if (fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!assemblyMap.ContainsKey(fileName))
+                            assemblyMap[fileName] = new List<string>();
+
+                        if (!assemblyMap[fileName].Contains(modName))
+                            assemblyMap[fileName].Add(modName);
+
+                        continue;
+                    }
+
                     if (context.Mode == ScanMode.Quick)
                     {
-                        FileInfo info = new FileInfo(file);
-
-                        if (info.Length == 0)
+                        try
                         {
-                            context.AddFileWarning(
-                                Severity.Warning,
-                                $"[{modName}] Zero-byte file: \"{relative}\""
-                            );
+                            var info = new FileInfo(file);
+                            if (info.Length == 0)
+                            {
+                                context.AddFileWarning(
+                                    Severity.Warning,
+                                    $"[{modName}] Zero-byte file: \"{relative}\""
+                                );
+                            }
                         }
-
-                        if (!pathMap.ContainsKey(relative))
-                            pathMap[relative] = new List<string>();
-                        pathMap[relative].Add(modName);
-
+                        catch
+                        {
+                            // Skip inaccessible file in quick mode
+                        }
                         continue;
                     }
 
                     RunHeuristics(file, modName, relative, context);
 
-                    if (!pathMap.ContainsKey(relative))
-                        pathMap[relative] = new List<string>();
-                    pathMap[relative].Add(modName);
-
-                    FileInfo deepInfo = new FileInfo(file);
-
-                    if (deepInfo.Length <= MaxHashSize)
+                    try
                     {
-                        string hash = ComputeHash(file);
-                        if (!hashMap.ContainsKey(hash))
-                            hashMap[hash] = new List<string>();
-                        hashMap[hash].Add($"{modName}:{relative}");
+                        var deepInfo = new FileInfo(file);
+                        if (deepInfo.Length <= MaxHashSize)
+                        {
+                            string hash = ComputeHash(file);
+                            if (!string.IsNullOrEmpty(hash))
+                            {
+                                if (!hashMap.ContainsKey(hash))
+                                    hashMap[hash] = new List<string>();
+                                hashMap[hash].Add($"{modName}:{relative}");
+                            }
+                        }
+                        else
+                        {
+                            context.AddFileWarning(
+                                Severity.Info,
+                                $"[{modName}] Skipped hashing large file (>100MB): \"{relative}\""
+                            );
+                        }
                     }
-                    else
+                    catch
                     {
-                        context.AddFileWarning(
-                            Severity.Info,
-                            $"[{modName}] Skipped hashing large file (>100MB): \"{relative}\""
-                        );
+                        // Non-critical hash failure
                     }
+                }
+            }
+        }
+
+        private void CheckLoosePlugins(string pluginsPath, HashSet<string> modFolderNames, ScanContext context)
+        {
+            if (!Directory.Exists(pluginsPath))
+                return;
+
+            foreach (var looseFile in Directory.GetFiles(pluginsPath, "*.dll", SearchOption.TopDirectoryOnly))
+            {
+                string nameWithoutExt = Path.GetFileNameWithoutExtension(looseFile);
+                if (modFolderNames.Contains(nameWithoutExt))
+                {
+                    context.AddFileWarning(
+                        Severity.Warning,
+                        $"Loose plugin \"{Path.GetFileName(looseFile)}\" in BepInEx/plugins may shadow or conflict with folder \"{nameWithoutExt}\"."
+                    );
                 }
             }
         }
 
         private void RunHeuristics(string filePath, string modName, string relative, ScanContext context)
         {
-            FileInfo info = new FileInfo(filePath);
+            FileInfo info;
+            try
+            {
+                info = new FileInfo(filePath);
+            }
+            catch
+            {
+                return;
+            }
+
             string ext = Path.GetExtension(relative).ToLowerInvariant();
 
             if (info.Length == 0)
             {
                 context.AddFileWarning(Severity.Warning, $"[{modName}] Zero-byte file: \"{relative}\"");
+                return;
             }
 
             if (info.Length > 50 * 1024 * 1024)
@@ -138,38 +197,35 @@ namespace ConflictScanner
             {
                 context.AddFileWarning(
                     Severity.Info,
-                    $"[{modName}] Suspicious file type: \"{relative}\""
+                    $"[{modName}] Leftover or temporary file: \"{relative}\""
                 );
             }
 
-            bool looksJson = ext == ".json" && LooksLikeJson(filePath);
-
-            if (ext == ".png" && !LooksLikePng(filePath))
+            if (ext == ".png")
             {
-                context.AddFileWarning(
-                    Severity.Critical,
-                    $"[{modName}] PNG file does not appear to be valid: \"{relative}\""
-                );
+                if (!LooksLikePng(filePath))
+                {
+                    context.AddFileWarning(
+                        Severity.Critical,
+                        $"[{modName}] PNG file appears corrupted or invalid header: \"{relative}\""
+                    );
+                }
+                return;
             }
 
-            if (ext == ".json" && !looksJson)
+            if (ext == ".json")
             {
-                context.AddFileWarning(
-                    Severity.Warning,
-                    $"[{modName}] JSON file may be invalid: \"{relative}\""
-                );
+                if (!LooksLikeJson(filePath))
+                {
+                    context.AddFileWarning(
+                        Severity.Warning,
+                        $"[{modName}] JSON file may be malformed (does not start with '{{' or '['): \"{relative}\""
+                    );
+                }
+                return;
             }
 
             string mime = MimeDetector.DetectMime(filePath);
-
-            if (ext == ".png" && mime != "image/png")
-            {
-                context.AddFileWarning(
-                    Severity.Error,
-                    $"[{modName}] File extension mismatch: \"{relative}\" is PNG but detected as {mime}"
-                );
-            }
-
             if (ext == ".ogg" && mime != "audio/ogg")
             {
                 context.AddFileWarning(
@@ -177,18 +233,7 @@ namespace ConflictScanner
                     $"[{modName}] File extension mismatch: \"{relative}\" is OGG but detected as {mime}"
                 );
             }
-
-            if (ext == ".json" && looksJson &&
-                mime != "application/json" && mime != "text/plain")
-            {
-                context.AddFileWarning(
-                    Severity.Error,
-                    $"[{modName}] JSON file appears invalid or binary: \"{relative}\" (detected {mime})"
-                );
-            }
-
-            if ((ext == ".txt" || ext == ".json") &&
-                mime == "application/octet-stream")
+            else if (ext == ".txt" && mime == "application/octet-stream")
             {
                 context.AddFileWarning(
                     Severity.Warning,
@@ -202,8 +247,9 @@ namespace ConflictScanner
             try
             {
                 byte[] header = new byte[8];
-                using var stream = File.OpenRead(file);
-                stream.Read(header, 0, 8);
+                using var stream = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                int read = stream.Read(header, 0, 8);
+                if (read < 8) return false;
 
                 return header[0] == 0x89 &&
                        header[1] == 0x50 &&
@@ -217,23 +263,40 @@ namespace ConflictScanner
         {
             try
             {
-                string text = File.ReadAllText(file).Trim();
-                return text.StartsWith("{") || text.StartsWith("[");
+                using var stream = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream, Encoding.UTF8, true, 512);
+
+                int ch;
+                while ((ch = reader.Read()) != -1)
+                {
+                    char c = (char)ch;
+                    if (!char.IsWhiteSpace(c))
+                        return c == '{' || c == '[';
+                }
+
+                return false;
             }
             catch { return false; }
         }
 
         private string ComputeHash(string filePath)
         {
-            using var sha = SHA256.Create();
-            using var stream = File.OpenRead(filePath);
-            byte[] hashBytes = sha.ComputeHash(stream);
+            try
+            {
+                using var sha = SHA256.Create();
+                using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                byte[] hashBytes = sha.ComputeHash(stream);
 
-            var sb = new StringBuilder(hashBytes.Length * 2);
-            foreach (byte b in hashBytes)
-                sb.Append(b.ToString("x2"));
+                var sb = new StringBuilder(hashBytes.Length * 2);
+                foreach (byte b in hashBytes)
+                    sb.Append(b.ToString("x2"));
 
-            return sb.ToString();
+                return sb.ToString();
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
     }
 }

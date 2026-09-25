@@ -14,10 +14,10 @@ namespace ConflictScanner.Reflection
     {
         private class PatchInfo
         {
-            public string ModName;
-            public string PatchType;
+            public string ModName = string.Empty;
+            public string PatchType = string.Empty;
             public int Priority;
-            public MethodInfo TargetMethod;
+            public MethodInfo TargetMethod = null!;
         }
 
         private readonly List<PatchInfo> patches = new();
@@ -26,6 +26,8 @@ namespace ConflictScanner.Reflection
         {
             if (context.Mode == ScanMode.Quick)
                 return;
+
+            patches.Clear();
 
             string bepPath = Path.Combine(context.GamePath, "BepInEx", "plugins");
             if (!Directory.Exists(bepPath))
@@ -46,7 +48,7 @@ namespace ConflictScanner.Reflection
 
         private void AnalyzeAssembly(string dllPath, string modName, ScanContext context)
         {
-            Assembly asm = ReflectionUtils.LoadAssemblySafe(dllPath);
+            Assembly? asm = ReflectionUtils.LoadAssemblySafe(dllPath);
             if (asm == null)
             {
                 context.AddHarmonyWarning(
@@ -56,36 +58,91 @@ namespace ConflictScanner.Reflection
                 return;
             }
 
-            foreach (var type in asm.GetTypes())
+            IEnumerable<Type> types;
+            try
             {
-                foreach (var method in type.GetMethods(
-                    BindingFlags.Public |
-                    BindingFlags.NonPublic |
-                    BindingFlags.Static |
-                    BindingFlags.Instance))
+                types = asm.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                types = ex.Types.Where(t => t != null)!;
+            }
+            catch (Exception ex)
+            {
+                context.AddHarmonyWarning(
+                    Severity.Info,
+                    $"[{modName}] Could not inspect types in {Path.GetFileName(dllPath)}: {ex.Message}"
+                );
+                return;
+            }
+
+            foreach (var type in types)
+            {
+                MethodInfo[] methods;
+                try
                 {
-                    AnalyzeMethod(method, modName, context);
+                    methods = type.GetMethods(
+                        BindingFlags.Public |
+                        BindingFlags.NonPublic |
+                        BindingFlags.Static |
+                        BindingFlags.Instance);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (var method in methods)
+                {
+                    try
+                    {
+                        AnalyzeMethod(method, modName, context);
+                    }
+                    catch
+                    {
+                        // Individual method failure does not abort scan
+                    }
                 }
             }
         }
 
         private void AnalyzeMethod(MethodInfo method, string modName, ScanContext context)
         {
-            var attrs = method.GetCustomAttributes().ToArray();
+            Attribute[] methodAttrs;
+            try
+            {
+                methodAttrs = method.GetCustomAttributes().ToArray();
+            }
+            catch
+            {
+                return;
+            }
 
-            bool hasPrefix = attrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyPrefix");
-            bool hasPostfix = attrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyPostfix");
-            bool hasTranspiler = attrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyTranspiler");
-            bool hasFinalizer = attrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyFinalizer");
+            bool hasPrefix = methodAttrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyPrefix");
+            bool hasPostfix = methodAttrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyPostfix");
+            bool hasTranspiler = methodAttrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyTranspiler");
+            bool hasFinalizer = methodAttrs.Any(a => a.GetType().FullName == "HarmonyLib.HarmonyFinalizer");
 
             if (!hasPrefix && !hasPostfix && !hasTranspiler && !hasFinalizer)
                 return;
 
-            var harmonyPatch = attrs.FirstOrDefault(a => a.GetType().FullName == "HarmonyLib.HarmonyPatch");
+            Attribute[] classAttrs;
+            try
+            {
+                classAttrs = method.DeclaringType?.GetCustomAttributes().ToArray() ?? Array.Empty<Attribute>();
+            }
+            catch
+            {
+                classAttrs = Array.Empty<Attribute>();
+            }
+
+            var harmonyPatch = methodAttrs.FirstOrDefault(a => a.GetType().FullName == "HarmonyLib.HarmonyPatch")
+                               ?? classAttrs.FirstOrDefault(a => a.GetType().FullName == "HarmonyLib.HarmonyPatch");
+
             if (harmonyPatch == null)
                 return;
 
-            MethodInfo target = ResolveTargetMethod(harmonyPatch);
+            MethodInfo? target = ResolveTargetMethod(harmonyPatch);
             if (target == null)
             {
                 context.AddHarmonyWarning(
@@ -95,7 +152,8 @@ namespace ConflictScanner.Reflection
                 return;
             }
 
-            int priority = ExtractPriority(attrs);
+            var allAttrs = methodAttrs.Concat(classAttrs).ToArray();
+            int priority = ExtractPriority(allAttrs);
 
             if (hasPrefix)
                 patches.Add(new PatchInfo { ModName = modName, PatchType = "Prefix", Priority = priority, TargetMethod = target });
@@ -110,25 +168,57 @@ namespace ConflictScanner.Reflection
                 patches.Add(new PatchInfo { ModName = modName, PatchType = "Finalizer", Priority = priority, TargetMethod = target });
         }
 
-        private MethodInfo ResolveTargetMethod(object harmonyPatch)
+        private MethodInfo? ResolveTargetMethod(object harmonyPatch)
         {
-            var type = harmonyPatch.GetType();
+            try
+            {
+                var type = harmonyPatch.GetType();
 
-            var typeField = type.GetField("originalType");
-            var nameField = type.GetField("methodName");
-            var argsField = type.GetField("argumentTypes");
+                object source = harmonyPatch;
+                var infoMember = type.GetField("info", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance) as MemberInfo
+                                  ?? type.GetProperty("info", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (infoMember != null)
+                {
+                    var val = infoMember is FieldInfo fi ? fi.GetValue(harmonyPatch) : ((PropertyInfo)infoMember).GetValue(harmonyPatch);
+                    if (val != null)
+                        source = val;
+                }
 
-            Type targetType = typeField?.GetValue(harmonyPatch) as Type;
-            string methodName = nameField?.GetValue(harmonyPatch) as string;
-            Type[] args = argsField?.GetValue(harmonyPatch) as Type[];
+                Type sourceType = source.GetType();
 
-            if (targetType == null || methodName == null)
+                Type? targetType = GetMemberValue(source, sourceType, "declaringType") as Type
+                                   ?? GetMemberValue(source, sourceType, "originalType") as Type;
+
+                string? methodName = GetMemberValue(source, sourceType, "methodName") as string;
+                Type[]? args = GetMemberValue(source, sourceType, "argumentTypes") as Type[];
+
+                if (targetType == null || methodName == null)
+                    return null;
+
+                var bindingFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance;
+
+                if (args != null && args.Length > 0)
+                    return targetType.GetMethod(methodName, bindingFlags, null, args, null);
+
+                return targetType.GetMethod(methodName, bindingFlags);
+            }
+            catch
+            {
                 return null;
+            }
+        }
 
-            if (args != null)
-                return targetType.GetMethod(methodName, args);
+        private static object? GetMemberValue(object instance, Type type, string name)
+        {
+            var field = type.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (field != null)
+                return field.GetValue(instance);
 
-            return targetType.GetMethod(methodName);
+            var prop = type.GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (prop != null && prop.CanRead)
+                return prop.GetValue(instance);
+
+            return null;
         }
 
         private int ExtractPriority(object[] attrs)
@@ -137,21 +227,21 @@ namespace ConflictScanner.Reflection
             if (priorityAttr == null)
                 return 400; // Harmony default
 
-            var field = priorityAttr.GetType().GetField("priority");
+            var field = priorityAttr.GetType().GetField("priority", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             if (field == null)
                 return 400;
 
-            return (int)field.GetValue(priorityAttr);
+            return (int)field.GetValue(priorityAttr)!;
         }
 
         private void DetectConflicts(ScanContext context)
         {
-            var groups = patches.GroupBy(p => p.TargetMethod);
+            var groups = patches.GroupBy(p => $"{p.TargetMethod.DeclaringType?.FullName ?? "Unknown"}.{p.TargetMethod.Name}");
 
             foreach (var group in groups)
             {
                 var list = group.ToList();
-                string targetName = $"{group.Key.DeclaringType.FullName}.{group.Key.Name}";
+                string targetName = group.Key;
 
                 var transpilers = list.Where(p => p.PatchType == "Transpiler").ToList();
                 if (transpilers.Count > 1)
@@ -182,9 +272,6 @@ namespace ConflictScanner.Reflection
                         );
                     }
                 }
-
-                // NOTE: Detecting skip-original would require IL analysis of prefix return values.
-                // Not implemented yet on purpose to avoid false positives.
             }
         }
     }

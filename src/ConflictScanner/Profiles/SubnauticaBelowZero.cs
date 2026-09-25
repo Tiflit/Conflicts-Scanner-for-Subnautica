@@ -4,13 +4,13 @@ using ConflictScanner.Reflection;
 
 namespace ConflictScanner.Profiles
 {
-    public class Subnautica : GameProfile
+    public class SubnauticaBelowZero : GameProfile
     {
-        public override string GameName => "Subnautica";
+        public override string GameName => "Subnautica: Below Zero";
 
         public override bool MatchesGame(string gamePath)
         {
-            string exe = Path.Combine(gamePath, "Subnautica.exe");
+            string exe = Path.Combine(gamePath, "SubnauticaZero.exe");
             return File.Exists(exe);
         }
 

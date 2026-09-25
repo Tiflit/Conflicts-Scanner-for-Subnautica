@@ -56,14 +56,17 @@ namespace ConflictScanner
 
         public static bool TryAutoLocateSubnautica(out string? path)
         {
-            if (TryFindSteamSubnautica(out path))
+            if (TryFindSteamGame(out path))
+                return true;
+
+            if (TryFindEpicGame(out path))
                 return true;
 
             path = null;
             return false;
         }
 
-        private static bool TryFindSteamSubnautica(out string? path)
+        private static bool TryFindSteamGame(out string? path)
         {
             path = null;
 
@@ -82,23 +85,65 @@ namespace ConflictScanner
                     return false;
 
                 var libraries = ParseSteamLibraryFolders(libraryFolders);
-                const string appId = "264710"; // Subnautica
+                // Check Subnautica (264710) then Below Zero (848450)
+                string[] appIds = { "264710", "848450" };
 
-                foreach (var lib in libraries)
+                foreach (var appId in appIds)
                 {
-                    string manifest = Path.Combine(lib, "steamapps", $"appmanifest_{appId}.acf");
-                    if (!File.Exists(manifest))
-                        continue;
-
-                    string? installDir = ParseSteamInstallDir(manifest);
-                    if (string.IsNullOrWhiteSpace(installDir))
-                        continue;
-
-                    string candidate = Path.Combine(lib, "steamapps", "common", installDir);
-                    if (Directory.Exists(candidate))
+                    foreach (var lib in libraries)
                     {
-                        path = candidate;
-                        return true;
+                        string manifest = Path.Combine(lib, "steamapps", $"appmanifest_{appId}.acf");
+                        if (!File.Exists(manifest))
+                            continue;
+
+                        string? installDir = ParseSteamInstallDir(manifest);
+                        if (string.IsNullOrWhiteSpace(installDir))
+                            continue;
+
+                        string candidate = Path.Combine(lib, "steamapps", "common", installDir);
+                        if (Directory.Exists(candidate))
+                        {
+                            path = candidate;
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        private static bool TryFindEpicGame(out string? path)
+        {
+            path = null;
+
+            if (!OperatingSystem.IsWindows())
+                return false;
+
+            try
+            {
+                string epicManifests = @"C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests";
+                if (!Directory.Exists(epicManifests))
+                    return false;
+
+                foreach (var file in Directory.GetFiles(epicManifests, "*.item"))
+                {
+                    string content = File.ReadAllText(file);
+                    if (content.Contains("\"Subnautica\"", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using var doc = JsonDocument.Parse(content);
+                        if (doc.RootElement.TryGetProperty("InstallLocation", out var loc))
+                        {
+                            string? installPath = loc.GetString();
+                            if (!string.IsNullOrWhiteSpace(installPath) && Directory.Exists(installPath))
+                            {
+                                path = installPath;
+                                return true;
+                            }
+                        }
                     }
                 }
             }
@@ -117,13 +162,6 @@ namespace ConflictScanner
             {
                 string[] lines = File.ReadAllLines(vdfPath);
 
-                // NOTE:
-                // This parser intentionally takes the last quoted token on each line
-                // and filters it through Directory.Exists. On modern Steam VDFs,
-                // this picks up "path" "D:\SteamLibrary" entries while ignoring
-                // numeric app IDs like "264710" "1234567890" (which are not directories).
-                // It is fragile but functional; be careful "improving" it without
-                // testing against real VDF samples.
                 foreach (var line in lines)
                 {
                     string trimmed = line.Trim();
