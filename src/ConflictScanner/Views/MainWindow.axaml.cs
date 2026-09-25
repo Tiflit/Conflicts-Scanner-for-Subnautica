@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -41,7 +42,7 @@ namespace ConflictScanner.Views
             if (DataContext is not MainWindowViewModel vm)
                 return;
 
-            if (string.IsNullOrWhiteSpace(vm.ReportText))
+            if (string.IsNullOrWhiteSpace(vm.ReportText) && vm.Findings.Count == 0)
             {
                 vm.Status = "No report to save.";
                 return;
@@ -53,19 +54,34 @@ namespace ConflictScanner.Views
                 SuggestedFileName = "ConflictScannerReport.txt",
                 FileTypeChoices = new[]
                 {
-                    new FilePickerFileType("Text files")
+                    new FilePickerFileType("Text files (*.txt)")
                     {
                         Patterns = new[] { "*.txt" }
+                    },
+                    new FilePickerFileType("JSON files (*.json)")
+                    {
+                        Patterns = new[] { "*.json" }
                     }
                 }
             });
 
             if (file is not null)
             {
+                string path = file.Path.LocalPath;
                 await using var stream = await file.OpenWriteAsync();
-                await using var writer = new StreamWriter(stream);
-                await writer.WriteAsync(vm.ReportText);
-                vm.Status = "Report saved.";
+
+                if (path.EndsWith(".json", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    var options = new JsonSerializerOptions { WriteIndented = true };
+                    await JsonSerializer.SerializeAsync(stream, vm.Findings, options);
+                    vm.Status = $"JSON report saved ({vm.Findings.Count} findings).";
+                }
+                else
+                {
+                    await using var writer = new StreamWriter(stream);
+                    await writer.WriteAsync(vm.ReportText);
+                    vm.Status = "Text report saved.";
+                }
             }
         }
     }

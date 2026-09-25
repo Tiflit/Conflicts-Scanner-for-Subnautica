@@ -5,7 +5,7 @@
         xmlns:vm="clr-namespace:ConflictScanner.ViewModels"
         xmlns:cs="clr-namespace:ConflictScanner"
         x:Class="ConflictScanner.Views.MainWindow"
-        Width="950" Height="650"
+        Width="980" Height="680"
         Title="Subnautica Conflict Scanner"
         mc:Ignorable="d">
 
@@ -48,59 +48,83 @@
         <TabControl Margin="4">
           <!-- Structured Findings Tab -->
           <TabItem Header="Findings">
-            <ListBox ItemsSource="{Binding Findings}" Background="Transparent">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="cs:Finding">
-                  <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                          BorderThickness="1"
-                          CornerRadius="4"
-                          Padding="8"
-                          Margin="0,2,0,4">
-                    <StackPanel Spacing="4">
-                      <!-- Badge Row -->
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Border Background="{DynamicResource SystemControlHighlightAccentBrush}"
-                                CornerRadius="3"
-                                Padding="4,2">
-                          <TextBlock Text="{Binding Impact}"
-                                     FontSize="11"
-                                     FontWeight="Bold"
-                                     Foreground="White"/>
-                        </Border>
-                        <Border Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}"
-                                CornerRadius="3"
-                                Padding="4,2">
-                          <TextBlock Text="{Binding Confidence}"
-                                     FontSize="11"
-                                     Opacity="0.85"/>
-                        </Border>
-                        <TextBlock Text="{Binding Category}"
+            <Grid RowDefinitions="Auto,*">
+              <!-- Filter Toolbar -->
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,8">
+                <TextBox Width="240"
+                         Watermark="Search findings, mod names..."
+                         Text="{Binding SearchFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Text="Category:" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                <ComboBox Width="120"
+                          ItemsSource="{Binding AvailableCategories}"
+                          SelectedItem="{Binding SelectedCategory}"/>
+                <TextBlock Text="Min Impact:" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                <ComboBox Width="130"
+                          ItemsSource="{Binding AvailableImpacts}"
+                          SelectedItem="{Binding SelectedMinImpact}"/>
+                <Button Content="Reset"
+                        Command="{Binding ResetFiltersCommand}"/>
+                <TextBlock VerticalAlignment="Center"
+                           Opacity="0.75"
+                           Margin="8,0,0,0"
+                           Text="{Binding FilteredFindings.Count, StringFormat='Showing {0} finding(s)'}"/>
+              </StackPanel>
+
+              <!-- Findings List -->
+              <ListBox Grid.Row="1" ItemsSource="{Binding FilteredFindings}" Background="Transparent">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="cs:Finding">
+                    <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="8"
+                            Margin="0,2,0,4">
+                      <StackPanel Spacing="4">
+                        <!-- Badge Row -->
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Border Background="{DynamicResource SystemControlHighlightAccentBrush}"
+                                  CornerRadius="3"
+                                  Padding="4,2">
+                            <TextBlock Text="{Binding Impact}"
+                                       FontSize="11"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+                          </Border>
+                          <Border Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}"
+                                  CornerRadius="3"
+                                  Padding="4,2">
+                            <TextBlock Text="{Binding Confidence}"
+                                       FontSize="11"
+                                       Opacity="0.85"/>
+                          </Border>
+                          <TextBlock Text="{Binding Category}"
+                                     FontWeight="SemiBold"
+                                     VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Description -->
+                        <TextBlock Text="{Binding Explanation}"
                                    FontWeight="SemiBold"
-                                   VerticalAlignment="Center"/>
+                                   TextWrapping="Wrap"/>
+
+                        <!-- Evidence / Action -->
+                        <TextBlock Text="{Binding Evidence}"
+                                   Opacity="0.75"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"/>
+
+                        <TextBlock Text="{Binding SuggestedAction, StringFormat='Recommendation: {0}'}"
+                                   IsVisible="{Binding SuggestedAction, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   FontStyle="Italic"
+                                   Opacity="0.85"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"/>
                       </StackPanel>
-
-                      <!-- Description -->
-                      <TextBlock Text="{Binding Explanation}"
-                                 FontWeight="SemiBold"
-                                 TextWrapping="Wrap"/>
-
-                      <!-- Evidence / Action -->
-                      <TextBlock Text="{Binding Evidence}"
-                                 Opacity="0.75"
-                                 FontSize="12"
-                                 TextWrapping="Wrap"/>
-
-                      <TextBlock Text="{Binding SuggestedAction, StringFormat='Recommendation: {0}'}"
-                                 IsVisible="{Binding SuggestedAction, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                 FontStyle="Italic"
-                                 Opacity="0.85"
-                                 FontSize="12"
-                                 TextWrapping="Wrap"/>
-                    </StackPanel>
-                  </Border>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
+                    </Border>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </Grid>
           </TabItem>
 
           <!-- Raw Report Text Tab -->
@@ -115,15 +139,19 @@
           </TabItem>
         </TabControl>
 
-        <!-- Scanning overlay -->
+        <!-- Scanning overlay with Cancel option -->
         <Border Background="{DynamicResource ScanOverlayBrush}"
                 IsVisible="{Binding IsBusy}">
           <StackPanel HorizontalAlignment="Center"
                       VerticalAlignment="Center"
-                      Spacing="8">
-            <TextBlock Text="Scanning..."
+                      Spacing="12">
+            <TextBlock Text="{Binding ProgressMessage}"
                        FontSize="18"
+                       FontWeight="SemiBold"
                        HorizontalAlignment="Center"/>
+            <Button Content="Cancel Scan"
+                    HorizontalAlignment="Center"
+                    Command="{Binding CancelScanCommand}"/>
           </StackPanel>
         </Border>
       </Grid>
@@ -140,7 +168,7 @@
               IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanNegationConverter}}"/>
       <TextBlock Opacity="0.6"
                  VerticalAlignment="Center"
-                 Text="ConflictScanner — v0.1.0"/>
+                 Text="ConflictScanner — v0.2.0"/>
     </StackPanel>
   </Grid>
 </Window>
