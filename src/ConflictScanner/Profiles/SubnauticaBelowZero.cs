@@ -1,6 +1,5 @@
 using System.IO;
 using ConflictScanner.Analysis;
-using ConflictScanner.Reflection;
 
 namespace ConflictScanner.Profiles
 {
@@ -23,10 +22,6 @@ namespace ConflictScanner.Profiles
             pipeline.Add(new QModAnalyzer());
             pipeline.Add(new FileOverrideAnalyzer());
             pipeline.Add(new PatcherAnalyzer());
-
-            // Deep Scan reflection analyzers
-            pipeline.Add(new NautilusReflectionAnalyzer());
-            pipeline.Add(new HarmonyReflectionAnalyzer());
         }
     }
 }

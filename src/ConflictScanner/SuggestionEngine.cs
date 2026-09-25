@@ -1,30 +1,73 @@
+using System;
+using System.Linq;
+
 namespace ConflictScanner
 {
     public static class SuggestionEngine
     {
         public static void Generate(ScanContext context)
         {
-            // Stage 1: simple, generic suggestions based on existing findings.
-            // We'll flesh this out later.
+            var findings = context.Findings;
+            if (findings.Count == 0)
+            {
+                context.Suggestions.Add("No conflicts or compatibility issues detected. Your modlist appears healthy!");
+                return;
+            }
 
-            if (context.FileWarnings.Count > 0)
+            int criticalCount = findings.Count(f => f.Impact == Impact.Critical);
+            int highCount = findings.Count(f => f.Impact == Impact.High);
+
+            if (criticalCount > 0)
             {
                 context.Suggestions.Add(
-                    "You have file conflicts or anomalies. Consider reviewing mods that appear repeatedly in File Conflicts."
+                    $"CRITICAL: Detected {criticalCount} fatal conflict(s). Game launch is likely to fail or crash until these are resolved."
+                );
+            }
+
+            bool hasDuplicateGuids = findings.Any(f => f.Category == "Metadata" && f.Impact == Impact.Critical);
+            if (hasDuplicateGuids)
+            {
+                context.Suggestions.Add(
+                    "DUPLICATE GUIDS: Multiple DLLs share the same BepInPlugin GUID. Remove redundant copies or old versions."
+                );
+            }
+
+            bool hasMissingDeps = findings.Any(f => f.Category == "Metadata" && f.Explanation.Contains("Missing required dependency"));
+            if (hasMissingDeps)
+            {
+                context.Suggestions.Add(
+                    "MISSING DEPENDENCIES: One or more mods declare missing required dependencies. Check the findings list and install the required prerequisites."
+                );
+            }
+
+            bool hasHarmonyTranspilerConflict = findings.Any(f => f.Category == "Harmony" && f.Impact == Impact.High);
+            if (hasHarmonyTranspilerConflict)
+            {
+                context.Suggestions.Add(
+                    "HARMONY COLLISION: Multiple transpilers target the same game method. These mods modify the exact same instructions and may not work together without a compatibility patch."
+                );
+            }
+
+            bool hasTechTypeConflict = findings.Any(f => f.Category == "Nautilus" && f.Impact == Impact.High);
+            if (hasTechTypeConflict)
+            {
+                context.Suggestions.Add(
+                    "TECHTYPE COLLISION: Multiple mods register identical TechType identifiers. Recipes or custom items may overwrite each other."
+                );
+            }
+
+            bool hasSmlAndNautilus = findings.Any(f => f.Category == "SMLHelper" && f.Impact >= Impact.High);
+            if (hasSmlAndNautilus)
+            {
+                context.Suggestions.Add(
+                    "FRAMEWORK INCOMPATIBILITY: SMLHelper and Nautilus are both installed. SMLHelper is deprecated for Subnautica 2.0+; replace legacy SMLHelper mods with Nautilus versions."
                 );
             }
 
             if (context.QModWarnings.Count > 0)
             {
                 context.Suggestions.Add(
-                    "You have QMod issues (duplicate IDs or missing dependencies). Fix these before investigating deeper conflicts."
-                );
-            }
-
-            if (context.NautilusWarnings.Count > 0)
-            {
-                context.Suggestions.Add(
-                    "You have potential Nautilus ID/TechType conflicts. Mods sharing the same Id/TechType may not work together."
+                    "LEGACY QMODS: QModManager mods detected. Modern Subnautica uses BepInEx. Legacy QMods will not load unless you are running the legacy game branch."
                 );
             }
         }
