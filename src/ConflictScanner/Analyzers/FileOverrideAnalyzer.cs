@@ -32,10 +32,19 @@ namespace ConflictScanner
             {
                 if (mods.Count > 1)
                 {
-                    context.AddFileWarning(
-                        Severity.Warning,
-                        $"Assembly collision: \"{dllName}\" is bundled by multiple mods ({string.Join(", ", mods)}). The game loader may load an unexpected version."
-                    );
+                    string msg = $"Assembly collision: \"{dllName}\" is bundled by multiple mods ({string.Join(", ", mods)}). The game loader may load an unexpected version.";
+                    context.FileWarnings.Add((Severity.Warning, msg));
+                    context.AddFinding(new Finding
+                    {
+                        Category = "Filesystem",
+                        Impact = Impact.High,
+                        Confidence = Confidence.Observed,
+                        InvolvedMods = mods,
+                        ResourceKey = dllName,
+                        Evidence = $"Assembly \"{dllName}\" bundled by mods: {string.Join(", ", mods)}",
+                        Explanation = msg,
+                        SuggestedAction = "Ensure both mods share a compatible version of this library or move shared libraries to BepInEx/plugins root."
+                    });
                 }
             }
 
@@ -46,10 +55,18 @@ namespace ConflictScanner
                 {
                     if (pair.Value.Count > 1)
                     {
-                        context.AddFileWarning(
-                            Severity.Info,
-                            $"Identical content shared (hash {pair.Key.Substring(0, 12)}…): {string.Join(", ", pair.Value)}"
-                        );
+                        string msg = $"Identical content shared (hash {pair.Key.Substring(0, 12)}…): {string.Join(", ", pair.Value)}";
+                        context.FileWarnings.Add((Severity.Info, msg));
+                        context.AddFinding(new Finding
+                        {
+                            Category = "Filesystem",
+                            Impact = Impact.Info,
+                            Confidence = Confidence.Observed,
+                            ResourceKey = pair.Key,
+                            Evidence = $"SHA-256 hash match: {pair.Key.Substring(0, 12)}…",
+                            Explanation = msg,
+                            SuggestedAction = "Informational: These files contain identical binary content."
+                        });
                     }
                 }
             }
@@ -68,10 +85,19 @@ namespace ConflictScanner
 
                 if (!modFolderNames.Add(modName))
                 {
-                    context.AddFileWarning(
-                        Severity.Error,
-                        $"Duplicate mod folder detected: \"{modName}\" exists in multiple locations."
-                    );
+                    string msg = $"Duplicate mod folder detected: \"{modName}\" exists in multiple locations.";
+                    context.FileWarnings.Add((Severity.Error, msg));
+                    context.AddFinding(new Finding
+                    {
+                        Category = "Filesystem",
+                        Impact = Impact.Critical,
+                        Confidence = Confidence.Observed,
+                        InvolvedMods = new[] { modName },
+                        ResourceKey = modName,
+                        Evidence = $"Mod folder \"{modName}\" exists in multiple directories",
+                        Explanation = msg,
+                        SuggestedAction = "Remove the duplicate copy of this mod folder."
+                    });
                 }
 
                 foreach (var file in Directory.GetFiles(modFolder, "*", SearchOption.AllDirectories))
@@ -103,10 +129,19 @@ namespace ConflictScanner
                             var info = new FileInfo(file);
                             if (info.Length == 0)
                             {
-                                context.AddFileWarning(
-                                    Severity.Warning,
-                                    $"[{modName}] Zero-byte file: \"{relative}\""
-                                );
+                                string msg = $"[{modName}] Zero-byte file: \"{relative}\"";
+                                context.FileWarnings.Add((Severity.Warning, msg));
+                                context.AddFinding(new Finding
+                                {
+                                    Category = "Filesystem",
+                                    Impact = Impact.Low,
+                                    Confidence = Confidence.Observed,
+                                    InvolvedMods = new[] { modName },
+                                    ResourceKey = relative,
+                                    Evidence = $"File size is 0 bytes: \"{relative}\"",
+                                    Explanation = msg,
+                                    SuggestedAction = "Remove or re-download the empty file."
+                                });
                             }
                         }
                         catch
@@ -133,10 +168,10 @@ namespace ConflictScanner
                         }
                         else
                         {
-                            context.AddFileWarning(
+                            context.FileWarnings.Add((
                                 Severity.Info,
                                 $"[{modName}] Skipped hashing large file (>100MB): \"{relative}\""
-                            );
+                            ));
                         }
                     }
                     catch
@@ -157,10 +192,19 @@ namespace ConflictScanner
                 string nameWithoutExt = Path.GetFileNameWithoutExtension(looseFile);
                 if (modFolderNames.Contains(nameWithoutExt))
                 {
-                    context.AddFileWarning(
-                        Severity.Warning,
-                        $"Loose plugin \"{Path.GetFileName(looseFile)}\" in BepInEx/plugins may shadow or conflict with folder \"{nameWithoutExt}\"."
-                    );
+                    string msg = $"Loose plugin \"{Path.GetFileName(looseFile)}\" in BepInEx/plugins may shadow or conflict with folder \"{nameWithoutExt}\".";
+                    context.FileWarnings.Add((Severity.Warning, msg));
+                    context.AddFinding(new Finding
+                    {
+                        Category = "Filesystem",
+                        Impact = Impact.Medium,
+                        Confidence = Confidence.Observed,
+                        InvolvedMods = new[] { nameWithoutExt },
+                        ResourceKey = Path.GetFileName(looseFile),
+                        Evidence = $"Loose DLL \"{Path.GetFileName(looseFile)}\" matches folder \"{nameWithoutExt}\"",
+                        Explanation = msg,
+                        SuggestedAction = "Check whether this is an orphaned DLL from a previous mod version and remove it if obsolete."
+                    });
                 }
             }
         }
@@ -181,34 +225,73 @@ namespace ConflictScanner
 
             if (info.Length == 0)
             {
-                context.AddFileWarning(Severity.Warning, $"[{modName}] Zero-byte file: \"{relative}\"");
+                string msg = $"[{modName}] Zero-byte file: \"{relative}\"";
+                context.FileWarnings.Add((Severity.Warning, msg));
+                context.AddFinding(new Finding
+                {
+                    Category = "Filesystem",
+                    Impact = Impact.Low,
+                    Confidence = Confidence.Observed,
+                    InvolvedMods = new[] { modName },
+                    ResourceKey = relative,
+                    Evidence = $"File size is 0 bytes: \"{relative}\"",
+                    Explanation = msg,
+                    SuggestedAction = "Remove or re-download the empty file."
+                });
                 return;
             }
 
             if (info.Length > 50 * 1024 * 1024)
             {
-                context.AddFileWarning(
-                    Severity.Warning,
-                    $"[{modName}] Large file (>50MB): \"{relative}\" ({info.Length / (1024 * 1024)} MB)"
-                );
+                string msg = $"[{modName}] Large file (>50MB): \"{relative}\" ({info.Length / (1024 * 1024)} MB)";
+                context.FileWarnings.Add((Severity.Warning, msg));
+                context.AddFinding(new Finding
+                {
+                    Category = "Filesystem",
+                    Impact = Impact.Low,
+                    Confidence = Confidence.Observed,
+                    InvolvedMods = new[] { modName },
+                    ResourceKey = relative,
+                    Evidence = $"File size is {info.Length / (1024 * 1024)} MB",
+                    Explanation = msg,
+                    SuggestedAction = "Informational: Large assets may increase game load times."
+                });
             }
 
             if (ext == ".meta" || ext == ".manifest" || ext == ".tmp" || ext == ".bak")
             {
-                context.AddFileWarning(
-                    Severity.Info,
-                    $"[{modName}] Leftover or temporary file: \"{relative}\""
-                );
+                string msg = $"[{modName}] Leftover or temporary file: \"{relative}\"";
+                context.FileWarnings.Add((Severity.Info, msg));
+                context.AddFinding(new Finding
+                {
+                    Category = "Filesystem",
+                    Impact = Impact.Info,
+                    Confidence = Confidence.Observed,
+                    InvolvedMods = new[] { modName },
+                    ResourceKey = relative,
+                    Evidence = $"File has temporary/leftover extension: {ext}",
+                    Explanation = msg,
+                    SuggestedAction = "Safe to delete if not needed by mod development tooling."
+                });
             }
 
             if (ext == ".png")
             {
                 if (!LooksLikePng(filePath))
                 {
-                    context.AddFileWarning(
-                        Severity.Critical,
-                        $"[{modName}] PNG file appears corrupted or invalid header: \"{relative}\""
-                    );
+                    string msg = $"[{modName}] PNG file appears corrupted or invalid header: \"{relative}\"";
+                    context.FileWarnings.Add((Severity.Critical, msg));
+                    context.AddFinding(new Finding
+                    {
+                        Category = "Filesystem",
+                        Impact = Impact.Critical,
+                        Confidence = Confidence.Observed,
+                        InvolvedMods = new[] { modName },
+                        ResourceKey = relative,
+                        Evidence = $"Corrupt PNG magic header in \"{relative}\"",
+                        Explanation = msg,
+                        SuggestedAction = "Replace or re-download the corrupted image asset."
+                    });
                 }
                 return;
             }
@@ -217,10 +300,19 @@ namespace ConflictScanner
             {
                 if (!LooksLikeJson(filePath))
                 {
-                    context.AddFileWarning(
-                        Severity.Warning,
-                        $"[{modName}] JSON file may be malformed (does not start with '{{' or '['): \"{relative}\""
-                    );
+                    string msg = $"[{modName}] JSON file may be malformed (does not start with '{{' or '['): \"{relative}\"";
+                    context.FileWarnings.Add((Severity.Warning, msg));
+                    context.AddFinding(new Finding
+                    {
+                        Category = "Filesystem",
+                        Impact = Impact.High,
+                        Confidence = Confidence.Observed,
+                        InvolvedMods = new[] { modName },
+                        ResourceKey = relative,
+                        Evidence = $"Malformed JSON file: \"{relative}\"",
+                        Explanation = msg,
+                        SuggestedAction = "Validate JSON syntax in this configuration file."
+                    });
                 }
                 return;
             }
@@ -228,17 +320,35 @@ namespace ConflictScanner
             string mime = MimeDetector.DetectMime(filePath);
             if (ext == ".ogg" && mime != "audio/ogg")
             {
-                context.AddFileWarning(
-                    Severity.Error,
-                    $"[{modName}] File extension mismatch: \"{relative}\" is OGG but detected as {mime}"
-                );
+                string msg = $"[{modName}] File extension mismatch: \"{relative}\" is OGG but detected as {mime}";
+                context.FileWarnings.Add((Severity.Error, msg));
+                context.AddFinding(new Finding
+                {
+                    Category = "Filesystem",
+                    Impact = Impact.High,
+                    Confidence = Confidence.Observed,
+                    InvolvedMods = new[] { modName },
+                    ResourceKey = relative,
+                    Evidence = $"File \"{relative}\" has extension .ogg but MIME is {mime}",
+                    Explanation = msg,
+                    SuggestedAction = "Ensure audio files are properly encoded as OGG Vorbis."
+                });
             }
             else if (ext == ".txt" && mime == "application/octet-stream")
             {
-                context.AddFileWarning(
-                    Severity.Warning,
-                    $"[{modName}] Text file appears to be binary: \"{relative}\""
-                );
+                string msg = $"[{modName}] Text file appears to be binary: \"{relative}\"";
+                context.FileWarnings.Add((Severity.Warning, msg));
+                context.AddFinding(new Finding
+                {
+                    Category = "Filesystem",
+                    Impact = Impact.Low,
+                    Confidence = Confidence.Observed,
+                    InvolvedMods = new[] { modName },
+                    ResourceKey = relative,
+                    Evidence = $"File \"{relative}\" has extension .txt but MIME is binary",
+                    Explanation = msg,
+                    SuggestedAction = "Informational: File has .txt extension but contains non-text binary data."
+                });
             }
         }
 

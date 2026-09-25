@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using ConflictScanner;
 using Xunit;
 
@@ -48,7 +49,7 @@ namespace ConflictScanner.Tests
         }
 
         [Fact]
-        public void Run_DuplicateAssemblyNames_ReportsCollisionWarning()
+        public void Run_DuplicateAssemblyNames_ReportsCollisionFinding()
         {
             string modADir = Path.Combine(_gameDir, "BepInEx", "plugins", "ModA");
             string modBDir = Path.Combine(_gameDir, "BepInEx", "plugins", "ModB");
@@ -65,6 +66,48 @@ namespace ConflictScanner.Tests
             analyzer.Run(context);
 
             Assert.Contains(context.FileWarnings, w => w.Message.Contains("SharedLib.dll") && w.Level == Severity.Warning);
+
+            var finding = context.Findings.FirstOrDefault(f => f.Category == "Filesystem" && f.ResourceKey == "SharedLib.dll");
+            Assert.NotNull(finding);
+            Assert.Equal(Impact.High, finding.Impact);
+            Assert.Contains("ModA", finding.InvolvedMods);
+            Assert.Contains("ModB", finding.InvolvedMods);
+        }
+
+        [Fact]
+        public void Run_DuplicateModFolder_ReportsCriticalFinding()
+        {
+            string bepMod = Path.Combine(_gameDir, "BepInEx", "plugins", "DuplicateMod");
+            string qmodMod = Path.Combine(_gameDir, "QMods", "DuplicateMod");
+            Directory.CreateDirectory(bepMod);
+            Directory.CreateDirectory(qmodMod);
+
+            var context = new ScanContext(_gameDir, ScanMode.Quick, "Subnautica");
+            var analyzer = new FileOverrideAnalyzer();
+
+            analyzer.Run(context);
+
+            var finding = context.Findings.FirstOrDefault(f => f.Category == "Filesystem" && f.ResourceKey == "DuplicateMod" && f.Impact == Impact.Critical);
+            Assert.NotNull(finding);
+            Assert.Contains("Duplicate mod folder detected", finding.Explanation);
+        }
+
+        [Fact]
+        public void Run_LoosePluginShadowingModFolder_ReportsMediumFinding()
+        {
+            string pluginsDir = Path.Combine(_gameDir, "BepInEx", "plugins");
+            string modFolder = Path.Combine(pluginsDir, "MyMod");
+            Directory.CreateDirectory(modFolder);
+            File.WriteAllBytes(Path.Combine(pluginsDir, "MyMod.dll"), new byte[] { 1, 2, 3 });
+
+            var context = new ScanContext(_gameDir, ScanMode.Quick, "Subnautica");
+            var analyzer = new FileOverrideAnalyzer();
+
+            analyzer.Run(context);
+
+            var finding = context.Findings.FirstOrDefault(f => f.Category == "Filesystem" && f.Impact == Impact.Medium);
+            Assert.NotNull(finding);
+            Assert.Contains("Loose plugin", finding.Explanation);
         }
     }
 }

@@ -9,7 +9,7 @@ namespace ConflictScanner
     /// <summary>
     /// Static Harmony patch analyzer powered by Mono.Cecil.
     /// Inspects class-level and method-level Harmony patches across mod assemblies
-    /// to detect transpiler collisions, prefix priority conflicts, and target contention.
+    /// to detect transpiler collisions, prefix priority conflicts, and prefix suppression.
     /// </summary>
     public class HarmonyAnalyzer : IAnalyzer
     {
@@ -31,7 +31,12 @@ namespace ConflictScanner
                 allPatches.AddRange(result.HarmonyPatches);
             }
 
-            if (allPatches.Count == 0)
+            AnalyzePatches(allPatches, context);
+        }
+
+        public static void AnalyzePatches(IReadOnlyList<HarmonyPatchTarget> allPatches, ScanContext context)
+        {
+            if (allPatches == null || allPatches.Count == 0)
                 return;
 
             var targetGroups = allPatches.GroupBy(p => $"{p.TargetTypeName}.{p.TargetMethodName}", StringComparer.OrdinalIgnoreCase);
@@ -91,6 +96,24 @@ namespace ConflictScanner
                             Evidence = $"Prefixes on {targetName}: {string.Join(", ", prefixes.Select(p => $"{p.ModName} (priority {p.Priority})"))}",
                             Explanation = $"Prefix priority tie on \"{targetName}\". Multiple mods attach prefix patches with the same priority, meaning their order of execution is undefined.",
                             SuggestedAction = "If one mod depends on running before or after the other, set explicit HarmonyPriority values."
+                        });
+                    }
+
+                    // 3. Prefix suppression check (Prefix returning boolean)
+                    var boolPrefixes = prefixes.Where(p => p.ReturnsBoolean).ToList();
+                    if (boolPrefixes.Count > 0)
+                    {
+                        var boolMods = boolPrefixes.Select(p => p.ModName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                        context.AddFinding(new Finding
+                        {
+                            Category = "Harmony",
+                            Impact = boolPrefixes.Count > 1 ? Impact.High : Impact.Medium,
+                            Confidence = Confidence.Probable,
+                            InvolvedMods = distinctPrefixMods,
+                            ResourceKey = targetName,
+                            Evidence = $"Suppressible prefix(es) on {targetName} by: {string.Join(", ", boolMods)}",
+                            Explanation = $"Potential prefix suppression on \"{targetName}\". Mod(s) {string.Join(", ", boolMods)} use boolean prefix patches that can cancel the original method and prevent other mods' patches from executing.",
+                            SuggestedAction = "Verify if these mods alter the same behavior, as one may suppress the other depending on execution order."
                         });
                     }
                 }

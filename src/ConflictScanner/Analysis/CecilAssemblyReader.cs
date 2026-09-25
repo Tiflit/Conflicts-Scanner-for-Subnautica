@@ -26,7 +26,8 @@ namespace ConflictScanner.Analysis
         string TargetTypeName,
         string TargetMethodName,
         string PatchType, // Prefix, Postfix, Transpiler, Finalizer
-        int Priority
+        int Priority,
+        bool ReturnsBoolean = false
     );
 
     public record NautilusRegistration(
@@ -168,7 +169,8 @@ namespace ConflictScanner.Analysis
                                    ?? ExtractHarmonyPriority(method.DeclaringType.CustomAttributes)
                                    ?? 400;
 
-                    result.HarmonyPatches.Add(new HarmonyPatchTarget(modName, targetType, targetMethod, patchType, priority));
+                    bool returnsBool = method.ReturnType.FullName == "System.Boolean";
+                    result.HarmonyPatches.Add(new HarmonyPatchTarget(modName, targetType, targetMethod, patchType, priority, returnsBool));
                 }
             }
 
