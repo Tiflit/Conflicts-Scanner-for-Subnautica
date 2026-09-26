@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -225,6 +226,59 @@ namespace ConflictScanner.ViewModels
                 }
 
                 FilteredFindings.Add(finding);
+            }
+        }
+
+        [RelayCommand]
+        public void OpenModFolder(Finding? finding)
+        {
+            if (string.IsNullOrWhiteSpace(GamePath))
+                return;
+
+            string targetFolder = string.Empty;
+            if (finding != null && finding.InvolvedMods.Count > 0)
+            {
+                foreach (var mod in finding.InvolvedMods)
+                {
+                    string bepMod = Path.Combine(GamePath, "BepInEx", "plugins", mod);
+                    string qmod = Path.Combine(GamePath, "QMods", mod);
+
+                    if (Directory.Exists(bepMod))
+                    {
+                        targetFolder = bepMod;
+                        break;
+                    }
+                    if (Directory.Exists(qmod))
+                    {
+                        targetFolder = qmod;
+                        break;
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(targetFolder))
+            {
+                string bepPlugins = Path.Combine(GamePath, "BepInEx", "plugins");
+                if (Directory.Exists(bepPlugins))
+                    targetFolder = bepPlugins;
+                else if (Directory.Exists(GamePath))
+                    targetFolder = GamePath;
+            }
+
+            if (!string.IsNullOrEmpty(targetFolder) && Directory.Exists(targetFolder))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = targetFolder,
+                        UseShellExecute = true
+                    });
+                }
+                catch
+                {
+                    // Non-critical
+                }
             }
         }
     }

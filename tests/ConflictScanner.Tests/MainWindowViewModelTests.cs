@@ -105,5 +105,18 @@ namespace ConflictScanner.Tests
             Assert.Equal(2, vm.FilteredFindings.Count);
             Assert.Empty(vm.SearchFilter);
         }
+
+        [Fact]
+        public void OpenModFolder_NullOrInvalidPath_DoesNotThrow()
+        {
+            var vm = new MainWindowViewModel();
+            var finding = new Finding
+            {
+                InvolvedMods = new[] { "NonExistentMod" }
+            };
+
+            vm.OpenModFolderCommand.Execute(finding);
+            vm.OpenModFolderCommand.Execute(null);
+        }
     }
 }
