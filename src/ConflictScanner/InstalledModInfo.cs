@@ -34,6 +34,8 @@ namespace ConflictScanner
             HasCriticalOrHigh ? ModHealthStatus.Error :
             ModHealthStatus.Warning;
 
+        public bool HasIssues => FindingsCount > 0;
+
         public List<string> AssemblyNames { get; } = new();
         public List<string> Dependencies { get; } = new();
     }
