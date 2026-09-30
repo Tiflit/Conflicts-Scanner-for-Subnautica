@@ -98,14 +98,7 @@ namespace ConflictScanner
             }
         }
 
-        private static string GetModName(string pluginsRoot, string dllPath)
-        {
-            string relative = Path.GetRelativePath(pluginsRoot, dllPath);
-            int slashIndex = relative.IndexOf(Path.DirectorySeparatorChar);
-            if (slashIndex > 0)
-                return relative[..slashIndex];
-
-            return Path.GetFileNameWithoutExtension(dllPath);
-        }
+        private static string GetModName(string pluginsRoot, string dllPath) =>
+            BepInPluginAnalyzer.GetModName(pluginsRoot, dllPath);
     }
 }

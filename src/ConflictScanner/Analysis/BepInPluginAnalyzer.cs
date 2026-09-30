@@ -20,17 +20,71 @@ namespace ConflictScanner.Analysis
             {
                 string modName = GetModName(bepPlugins, dll);
                 var result = CecilAssemblyReader.AnalyzeAssembly(dll, modName);
-                if (result == null)
-                    continue;
 
-                foreach (var plugin in result.Plugins)
+                string dirPath = Path.GetDirectoryName(dll) ?? bepPlugins;
+                string relPath = Path.GetRelativePath(context.GamePath, dirPath).Replace('\\', '/');
+
+                if (result != null && result.Plugins.Count > 0)
                 {
-                    plugins.Add(plugin);
+                    foreach (var plugin in result.Plugins)
+                    {
+                        plugins.Add(plugin);
 
-                    if (!guidMap.ContainsKey(plugin.Guid))
-                        guidMap[plugin.Guid] = new List<string>();
+                        if (!guidMap.ContainsKey(plugin.Guid))
+                            guidMap[plugin.Guid] = new List<string>();
 
-                    guidMap[plugin.Guid].Add(plugin.ModName);
+                        guidMap[plugin.Guid].Add(plugin.ModName);
+
+                        var modInfo = new InstalledModInfo
+                        {
+                            Name = !string.IsNullOrWhiteSpace(plugin.Name) ? plugin.Name : plugin.ModName,
+                            Version = plugin.Version,
+                            GuidOrId = plugin.Guid,
+                            Loader = ModLoaderType.BepInEx,
+                            FolderPath = dirPath,
+                            RelativePath = relPath
+                        };
+                        modInfo.AssemblyNames.Add(Path.GetFileName(dll));
+                        foreach (var dep in plugin.Dependencies)
+                            modInfo.Dependencies.Add(dep.TargetGuid);
+
+                        context.RegisterOrUpdateMod(modInfo);
+                    }
+                }
+                else
+                {
+                    var modInfo = new InstalledModInfo
+                    {
+                        Name = modName,
+                        Version = string.Empty,
+                        GuidOrId = Path.GetFileNameWithoutExtension(dll),
+                        Loader = ModLoaderType.BepInEx,
+                        FolderPath = dirPath,
+                        RelativePath = relPath
+                    };
+                    modInfo.AssemblyNames.Add(Path.GetFileName(dll));
+                    context.RegisterOrUpdateMod(modInfo);
+                }
+            }
+
+            // Register well-known core mod GUIDs if their assemblies are present on disk
+            var knownCoreGuids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Nautilus.dll", "com.snmodding.nautilus" },
+                { "ConfigurationManager.dll", "com.bepis.bepinex.configurationmanager" },
+                { "SMLHelper.dll", "com.ahk1221.smlhelper" }
+            };
+
+            foreach (var (dllName, knownGuid) in knownCoreGuids)
+            {
+                if (!guidMap.ContainsKey(knownGuid))
+                {
+                    bool exists = Directory.EnumerateFiles(bepPlugins, dllName, SearchOption.AllDirectories).Any();
+                    if (exists)
+                    {
+                        string knownName = Path.GetFileNameWithoutExtension(dllName);
+                        guidMap[knownGuid] = new List<string> { knownName };
+                    }
                 }
             }
 
@@ -223,14 +277,27 @@ namespace ConflictScanner.Analysis
             };
         }
 
-        private static string GetModName(string pluginsRoot, string dllPath)
+        public static string GetModName(string pluginsRoot, string dllPath)
         {
             string relative = Path.GetRelativePath(pluginsRoot, dllPath);
-            int slashIndex = relative.IndexOf(Path.DirectorySeparatorChar);
-            if (slashIndex > 0)
-                return relative[..slashIndex];
+            string? dir = Path.GetDirectoryName(relative);
+            if (string.IsNullOrEmpty(dir))
+            {
+                return Path.GetFileNameWithoutExtension(dllPath);
+            }
 
-            return Path.GetFileNameWithoutExtension(dllPath);
+            string leaf = Path.GetFileName(dir);
+            if (leaf.Equals("Assets", StringComparison.OrdinalIgnoreCase) ||
+                leaf.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
+                leaf.Equals("lib", StringComparison.OrdinalIgnoreCase) ||
+                leaf.Equals("plugins", StringComparison.OrdinalIgnoreCase))
+            {
+                string? parent = Path.GetDirectoryName(dir);
+                if (!string.IsNullOrEmpty(parent))
+                    return Path.GetFileName(parent);
+            }
+
+            return leaf;
         }
     }
 }

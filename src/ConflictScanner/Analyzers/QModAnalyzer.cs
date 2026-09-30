@@ -90,6 +90,22 @@ namespace ConflictScanner
 
                     manifests.Add((modFolder, manifest));
 
+                    var modInfo = new InstalledModInfo
+                    {
+                        Name = !string.IsNullOrWhiteSpace(manifest.DisplayName) ? manifest.DisplayName : manifest.Id,
+                        Version = manifest.Version ?? "1.0.0",
+                        GuidOrId = manifest.Id,
+                        Loader = ModLoaderType.QMod,
+                        FolderPath = modFolder,
+                        RelativePath = Path.GetRelativePath(context.GamePath, modFolder).Replace('\\', '/')
+                    };
+                    if (manifest.Dependencies != null)
+                    {
+                        foreach (var dep in manifest.Dependencies)
+                            modInfo.Dependencies.Add(dep);
+                    }
+                    context.RegisterOrUpdateMod(modInfo);
+
                     if (!idCounts.ContainsKey(manifest.Id))
                         idCounts[manifest.Id] = 0;
 

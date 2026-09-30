@@ -58,10 +58,27 @@ namespace ConflictScanner.Analysis
                 AssemblyPath = filePath
             };
 
+            var resolver = new DefaultAssemblyResolver();
+            try
+            {
+                string? dir = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    resolver.AddSearchDirectory(dir);
+                    string? parent = Directory.GetParent(dir)?.FullName;
+                    if (!string.IsNullOrEmpty(parent) && Directory.Exists(parent))
+                    {
+                        resolver.AddSearchDirectory(parent);
+                    }
+                }
+            }
+            catch { }
+
             var readerParams = new ReaderParameters
             {
                 ReadSymbols = false,
-                ReadingMode = ReadingMode.Deferred
+                ReadingMode = ReadingMode.Deferred,
+                AssemblyResolver = resolver
             };
 
             try
@@ -73,7 +90,14 @@ namespace ConflictScanner.Analysis
                 {
                     foreach (var type in module.Types)
                     {
-                        InspectType(type, modName, result);
+                        try
+                        {
+                            InspectType(type, modName, result);
+                        }
+                        catch
+                        {
+                            // Keep analyzing remaining types even if one is malformed
+                        }
                     }
                 }
 
@@ -81,62 +105,95 @@ namespace ConflictScanner.Analysis
             }
             catch
             {
-                // Unreadable or non-.NET assembly
-                return null;
+                // Return partial result if plugins/patches were already successfully extracted
+                return (result.Plugins.Count > 0 || result.HarmonyPatches.Count > 0 || result.NautilusRegistrations.Count > 0)
+                    ? result
+                    : null;
             }
         }
 
         private static void InspectType(TypeDefinition type, string modName, AssemblyAnalysisResult result)
         {
             // 1. Inspect BepInPlugin attributes
-            foreach (var attr in type.CustomAttributes)
+            try
             {
-                if (attr.AttributeType.FullName == "BepInEx.BepInPlugin" && attr.ConstructorArguments.Count >= 3)
+                if (type.HasCustomAttributes)
                 {
-                    string guid = attr.ConstructorArguments[0].Value?.ToString() ?? string.Empty;
-                    string name = attr.ConstructorArguments[1].Value?.ToString() ?? string.Empty;
-                    string version = attr.ConstructorArguments[2].Value?.ToString() ?? string.Empty;
-
-                    var deps = new List<BepInDependencyInfo>();
-                    foreach (var depAttr in type.CustomAttributes)
+                    foreach (var attr in type.CustomAttributes)
                     {
-                        if (depAttr.AttributeType.FullName == "BepInEx.BepInDependency" && depAttr.ConstructorArguments.Count >= 1)
+                        if (attr.AttributeType?.FullName == "BepInEx.BepInPlugin" && attr.ConstructorArguments.Count >= 3)
                         {
-                            string depGuid = depAttr.ConstructorArguments[0].Value?.ToString() ?? string.Empty;
-                            bool isHard = true;
-                            if (depAttr.ConstructorArguments.Count >= 2 && depAttr.ConstructorArguments[1].Value is int flagVal)
+                            string guid = attr.ConstructorArguments[0].Value?.ToString() ?? string.Empty;
+                            string name = attr.ConstructorArguments[1].Value?.ToString() ?? string.Empty;
+                            string version = attr.ConstructorArguments[2].Value?.ToString() ?? string.Empty;
+
+                            var deps = new List<BepInDependencyInfo>();
+                            foreach (var depAttr in type.CustomAttributes)
                             {
-                                isHard = flagVal == 1; // 1 = HardDependency, 2 = SoftDependency
+                                if (depAttr.AttributeType?.FullName == "BepInEx.BepInDependency" && depAttr.ConstructorArguments.Count >= 1)
+                                {
+                                    string depGuid = depAttr.ConstructorArguments[0].Value?.ToString() ?? string.Empty;
+                                    bool isHard = true;
+                                    if (depAttr.ConstructorArguments.Count >= 2 && depAttr.ConstructorArguments[1].Value is int flagVal)
+                                    {
+                                        isHard = flagVal == 1; // 1 = HardDependency, 2 = SoftDependency
+                                    }
+                                    if (!string.IsNullOrWhiteSpace(depGuid))
+                                        deps.Add(new BepInDependencyInfo(depGuid.Trim(), isHard));
+                                }
                             }
-                            if (!string.IsNullOrWhiteSpace(depGuid))
-                                deps.Add(new BepInDependencyInfo(depGuid, isHard));
+
+                            if (!string.IsNullOrWhiteSpace(guid))
+                            {
+                                result.Plugins.Add(new BepInPluginInfo(modName, result.AssemblyPath, guid.Trim(), name.Trim(), version.Trim(), deps));
+                            }
                         }
                     }
+                }
+            }
+            catch { }
 
-                    if (!string.IsNullOrWhiteSpace(guid))
+            // 2. Check for class-level HarmonyPatch
+            string? classTargetType = null;
+            string? classTargetMethod = null;
+            try
+            {
+                if (type.HasCustomAttributes)
+                {
+                    (classTargetType, classTargetMethod) = ExtractHarmonyPatchTarget(type.CustomAttributes);
+                }
+            }
+            catch { }
+
+            // 3. Inspect methods
+            try
+            {
+                if (type.HasMethods)
+                {
+                    foreach (var method in type.Methods)
                     {
-                        result.Plugins.Add(new BepInPluginInfo(modName, result.AssemblyPath, guid, name, version, deps));
+                        try
+                        {
+                            InspectMethod(method, modName, classTargetType, classTargetMethod, result);
+                        }
+                        catch { }
                     }
                 }
             }
-
-            // 2. Check for class-level HarmonyPatch
-            var (classTargetType, classTargetMethod) = ExtractHarmonyPatchTarget(type.CustomAttributes);
-
-            // 3. Inspect methods
-            foreach (var method in type.Methods)
-            {
-                InspectMethod(method, modName, classTargetType, classTargetMethod, result);
-            }
+            catch { }
 
             // Nested types
-            if (type.HasNestedTypes)
+            try
             {
-                foreach (var nested in type.NestedTypes)
+                if (type.HasNestedTypes)
                 {
-                    InspectType(nested, modName, result);
+                    foreach (var nested in type.NestedTypes)
+                    {
+                        InspectType(nested, modName, result);
+                    }
                 }
             }
+            catch { }
         }
 
         private static void InspectMethod(
@@ -148,37 +205,48 @@ namespace ConflictScanner.Analysis
         {
             // Harmony patch detection on method
             string? patchType = null;
-            foreach (var attr in method.CustomAttributes)
+            try
             {
-                string fn = attr.AttributeType.FullName;
-                if (fn == "HarmonyLib.HarmonyPrefix" || fn == "Harmony.HarmonyPrefix") patchType = "Prefix";
-                else if (fn == "HarmonyLib.HarmonyPostfix" || fn == "Harmony.HarmonyPostfix") patchType = "Postfix";
-                else if (fn == "HarmonyLib.HarmonyTranspiler" || fn == "Harmony.HarmonyTranspiler") patchType = "Transpiler";
-                else if (fn == "HarmonyLib.HarmonyFinalizer" || fn == "Harmony.HarmonyFinalizer") patchType = "Finalizer";
-            }
-
-            if (patchType != null)
-            {
-                var (methodTargetType, methodTargetMethod) = ExtractHarmonyPatchTarget(method.CustomAttributes);
-                string? targetType = methodTargetType ?? classTargetType;
-                string? targetMethod = methodTargetMethod ?? classTargetMethod;
-
-                if (!string.IsNullOrWhiteSpace(targetType) && !string.IsNullOrWhiteSpace(targetMethod))
+                if (method.HasCustomAttributes)
                 {
-                    int priority = ExtractHarmonyPriority(method.CustomAttributes)
-                                   ?? ExtractHarmonyPriority(method.DeclaringType.CustomAttributes)
-                                   ?? 400;
+                    foreach (var attr in method.CustomAttributes)
+                    {
+                        string? fn = attr.AttributeType?.FullName;
+                        if (fn == "HarmonyLib.HarmonyPrefix" || fn == "Harmony.HarmonyPrefix") patchType = "Prefix";
+                        else if (fn == "HarmonyLib.HarmonyPostfix" || fn == "Harmony.HarmonyPostfix") patchType = "Postfix";
+                        else if (fn == "HarmonyLib.HarmonyTranspiler" || fn == "Harmony.HarmonyTranspiler") patchType = "Transpiler";
+                        else if (fn == "HarmonyLib.HarmonyFinalizer" || fn == "Harmony.HarmonyFinalizer") patchType = "Finalizer";
+                    }
+                }
 
-                    bool returnsBool = method.ReturnType.FullName == "System.Boolean";
-                    result.HarmonyPatches.Add(new HarmonyPatchTarget(modName, targetType, targetMethod, patchType, priority, returnsBool));
+                if (patchType != null)
+                {
+                    var (methodTargetType, methodTargetMethod) = ExtractHarmonyPatchTarget(method.CustomAttributes);
+                    string? targetType = methodTargetType ?? classTargetType;
+                    string? targetMethod = methodTargetMethod ?? classTargetMethod;
+
+                    if (!string.IsNullOrWhiteSpace(targetType) && !string.IsNullOrWhiteSpace(targetMethod))
+                    {
+                        int priority = ExtractHarmonyPriority(method.CustomAttributes)
+                                       ?? (method.DeclaringType != null ? ExtractHarmonyPriority(method.DeclaringType.CustomAttributes) : null)
+                                       ?? 400;
+
+                        bool returnsBool = method.ReturnType?.FullName == "System.Boolean";
+                        result.HarmonyPatches.Add(new HarmonyPatchTarget(modName, targetType, targetMethod, patchType, priority, returnsBool));
+                    }
                 }
             }
+            catch { }
 
             // Method body instruction inspection (Nautilus calls)
-            if (method.HasBody && method.Body.Instructions.Count > 0)
+            try
             {
-                InspectInstructions(method.Body, modName, result);
+                if (method.HasBody && method.Body != null && method.Body.Instructions.Count > 0)
+                {
+                    InspectInstructions(method.Body, modName, result);
+                }
             }
+            catch { }
         }
 
         private static void InspectInstructions(MethodBody body, string modName, AssemblyAnalysisResult result)
@@ -189,10 +257,10 @@ namespace ConflictScanner.Analysis
                 var instr = instructions[i];
                 if (instr.OpCode == OpCodes.Call || instr.OpCode == OpCodes.Callvirt)
                 {
-                    if (instr.Operand is MethodReference methodRef)
+                    if (instr.Operand is MethodReference methodRef && methodRef.DeclaringType != null)
                     {
-                        string declType = methodRef.DeclaringType.FullName;
-                        string mName = methodRef.Name;
+                        string declType = methodRef.DeclaringType.FullName ?? string.Empty;
+                        string mName = methodRef.Name ?? string.Empty;
 
                         // Nautilus / SMLHelper TechType registration
                         bool isTechType = (declType.Contains("EnumHandler") && mName == "AddEntry") ||
@@ -230,7 +298,6 @@ namespace ConflictScanner.Analysis
 
         private static string? FindPrecedingString(Mono.Collections.Generic.Collection<Instruction> instructions, int callIndex)
         {
-            // Look back up to 4 instructions for a direct string literal operand
             for (int i = callIndex - 1; i >= Math.Max(0, callIndex - 4); i--)
             {
                 var instr = instructions[i];
@@ -247,7 +314,7 @@ namespace ConflictScanner.Analysis
 
             foreach (var attr in attributes)
             {
-                if (attr.AttributeType.FullName == "HarmonyLib.HarmonyPatch" || attr.AttributeType.FullName == "Harmony.HarmonyPatch")
+                if (attr.AttributeType?.FullName == "HarmonyLib.HarmonyPatch" || attr.AttributeType?.FullName == "Harmony.HarmonyPatch")
                 {
                     foreach (var arg in attr.ConstructorArguments)
                     {
@@ -270,7 +337,7 @@ namespace ConflictScanner.Analysis
         {
             foreach (var attr in attributes)
             {
-                if (attr.AttributeType.FullName == "HarmonyLib.HarmonyPriority" || attr.AttributeType.FullName == "Harmony.HarmonyPriority")
+                if (attr.AttributeType?.FullName == "HarmonyLib.HarmonyPriority" || attr.AttributeType?.FullName == "Harmony.HarmonyPriority")
                 {
                     if (attr.ConstructorArguments.Count > 0 && attr.ConstructorArguments[0].Value is int prio)
                         return prio;

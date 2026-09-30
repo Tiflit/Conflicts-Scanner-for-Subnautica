@@ -140,6 +140,105 @@
             </Grid>
           </TabItem>
 
+          <!-- Installed Mods Tab -->
+          <TabItem Header="Installed Mods">
+            <Grid RowDefinitions="Auto,*">
+              <!-- Filter Toolbar -->
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,8">
+                <TextBox Width="260"
+                         Watermark="Search mods, assemblies, GUIDs..."
+                         Text="{Binding ModFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Text="Status:" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                <ComboBox Width="130"
+                          ItemsSource="{Binding AvailableModStatusFilters}"
+                          SelectedItem="{Binding SelectedModStatusFilter}"/>
+                <Button Content="Reset"
+                        Command="{Binding ResetModFiltersCommand}"/>
+                <TextBlock VerticalAlignment="Center"
+                           Opacity="0.75"
+                           Margin="8,0,0,0"
+                           Text="{Binding FilteredInstalledMods.Count, StringFormat='Showing {0} mod(s)'}"/>
+              </StackPanel>
+
+              <!-- Mods List -->
+              <ListBox Grid.Row="1" ItemsSource="{Binding FilteredInstalledMods}" Background="Transparent">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="cs:InstalledModInfo">
+                    <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="8"
+                            Margin="0,2,0,4">
+                      <Grid ColumnDefinitions="Auto,Auto,*,Auto" RowDefinitions="Auto,Auto">
+                        <!-- Status Badge -->
+                        <Border Grid.Column="0" Grid.Row="0"
+                                Background="{Binding Status, Converter={StaticResource ModStatusColorConverter}}"
+                                CornerRadius="3"
+                                Padding="6,2"
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Status}"
+                                     FontSize="11"
+                                     FontWeight="Bold"
+                                     Foreground="White"/>
+                        </Border>
+
+                        <!-- Loader Badge -->
+                        <Border Grid.Column="1" Grid.Row="0"
+                                Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}"
+                                CornerRadius="3"
+                                Padding="6,2"
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Loader}"
+                                     FontSize="11"
+                                     Opacity="0.85"/>
+                        </Border>
+
+                        <!-- Mod Name & Version -->
+                        <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Name}"
+                                     FontWeight="Bold"
+                                     FontSize="14"/>
+                          <TextBlock Text="{Binding Version, StringFormat='(v{0})'}"
+                                     IsVisible="{Binding Version, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                     Opacity="0.75"
+                                     FontSize="12"
+                                     VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Open Folder Button -->
+                        <Button Grid.Column="3" Grid.Row="0"
+                                Content="Open Folder"
+                                FontSize="11"
+                                Padding="8,3"
+                                VerticalAlignment="Center"
+                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenInstalledModFolderCommand}"
+                                CommandParameter="{Binding}"/>
+
+                        <!-- Detail Row (GUID & Path & Issues) -->
+                        <StackPanel Grid.Column="2" Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="16" Margin="0,4,0,0">
+                          <TextBlock Text="{Binding GuidOrId, StringFormat='ID: {0}'}"
+                                     IsVisible="{Binding GuidOrId, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                     Opacity="0.7"
+                                     FontSize="11"/>
+                          <TextBlock Text="{Binding RelativePath, StringFormat='Location: {0}'}"
+                                     Opacity="0.7"
+                                     FontSize="11"/>
+                          <TextBlock Text="{Binding FindingsCount, StringFormat='{0} issue(s) reported'}"
+                                     IsVisible="{Binding FindingsCount}"
+                                     FontWeight="SemiBold"
+                                     Foreground="#C62828"
+                                     FontSize="11"/>
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </Grid>
+          </TabItem>
+
           <!-- Raw Report Text Tab -->
           <TabItem Header="Raw Report">
             <TextBox Text="{Binding ReportText}"

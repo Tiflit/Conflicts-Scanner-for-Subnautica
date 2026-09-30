@@ -14,11 +14,17 @@ namespace ConflictScanner
 
         public static readonly HashSet<string> FileNames = new(StringComparer.OrdinalIgnoreCase)
         {
-            "readme", "changelog", "license", "credits"
+            "readme", "changelog", "license", "credits",
+            "__folder_managed_by_vortex"
         };
 
         public static bool ShouldIgnore(string relativePath)
         {
+            string fileName = Path.GetFileName(relativePath);
+            if (string.Equals(fileName, "__folder_managed_by_vortex", StringComparison.OrdinalIgnoreCase) ||
+                fileName.StartsWith(".vortex", StringComparison.OrdinalIgnoreCase))
+                return true;
+
             string ext = Path.GetExtension(relativePath);
             if (Extensions.Contains(ext))
                 return true;

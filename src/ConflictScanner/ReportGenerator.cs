@@ -22,6 +22,21 @@ namespace ConflictScanner
             sb.AppendLine($"Findings  : {context.Findings.Count}");
             sb.AppendLine();
 
+            if (context.InstalledMods.Count > 0)
+            {
+                int cleanCount = context.InstalledMods.Count(m => m.Status == ModHealthStatus.Clean);
+                int issueCount = context.InstalledMods.Count - cleanCount;
+                sb.AppendLine($"=== Installed Mods ({context.InstalledMods.Count} detected: {cleanCount} clean, {issueCount} with issues) ===");
+
+                foreach (var mod in context.InstalledMods.OrderBy(m => m.Name))
+                {
+                    string ver = !string.IsNullOrWhiteSpace(mod.Version) ? $" (v{mod.Version})" : string.Empty;
+                    string status = mod.FindingsCount == 0 ? "Clean" : $"{mod.FindingsCount} issue(s) detected";
+                    sb.AppendLine($"• {mod.Name}{ver} [{mod.Loader}] — {status}");
+                }
+                sb.AppendLine();
+            }
+
             var categories = context.Findings
                 .Select(f => f.Category)
                 .Distinct(StringComparer.OrdinalIgnoreCase)

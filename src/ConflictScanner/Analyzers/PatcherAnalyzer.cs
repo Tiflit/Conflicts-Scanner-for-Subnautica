@@ -39,6 +39,19 @@ namespace ConflictScanner
                 patcherDlls.Add(relative);
                 context.AddPatcher(relative);
 
+                string patcherDir = Path.GetDirectoryName(dll) ?? patchersPath;
+                var patcherMod = new InstalledModInfo
+                {
+                    Name = Path.GetFileNameWithoutExtension(dll),
+                    Version = string.Empty,
+                    GuidOrId = relative,
+                    Loader = ModLoaderType.Patcher,
+                    FolderPath = patcherDir,
+                    RelativePath = $"BepInEx/patchers/{relative}"
+                };
+                patcherMod.AssemblyNames.Add(Path.GetFileName(dll));
+                context.RegisterOrUpdateMod(patcherMod);
+
                 context.AddFinding(new Finding
                 {
                     Category = "Patcher",

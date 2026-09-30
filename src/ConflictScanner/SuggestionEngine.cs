@@ -7,6 +7,8 @@ namespace ConflictScanner
     {
         public static void Generate(ScanContext context)
         {
+            context.UpdateModFindings();
+
             var findings = context.Findings;
             if (findings.Count == 0)
             {

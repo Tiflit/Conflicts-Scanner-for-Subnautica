@@ -33,13 +33,25 @@ namespace ConflictScanner.ViewModels
         private int _findingsCount;
 
         [ObservableProperty]
+        private int _installedModsCount;
+
+        [ObservableProperty]
+        private int _cleanModsCount;
+
+        [ObservableProperty]
         private string _searchFilter = string.Empty;
+
+        [ObservableProperty]
+        private string _modFilter = string.Empty;
 
         [ObservableProperty]
         private string _selectedCategory = "All";
 
         [ObservableProperty]
         private string _selectedMinImpact = "All";
+
+        [ObservableProperty]
+        private string _selectedModStatusFilter = "All";
 
         [ObservableProperty]
         private string _progressMessage = "Scanning...";
@@ -49,6 +61,9 @@ namespace ConflictScanner.ViewModels
         public ObservableCollection<Finding> Findings { get; } = new();
         public ObservableCollection<Finding> FilteredFindings { get; } = new();
 
+        public ObservableCollection<InstalledModInfo> InstalledMods { get; } = new();
+        public ObservableCollection<InstalledModInfo> FilteredInstalledMods { get; } = new();
+
         public IReadOnlyList<string> AvailableCategories { get; } = new[]
         {
             "All", "Metadata", "Dependencies", "Compatibility", "Harmony", "Nautilus", "Filesystem", "Patcher", "SMLHelper", "QMod"
@@ -57,6 +72,11 @@ namespace ConflictScanner.ViewModels
         public IReadOnlyList<string> AvailableImpacts { get; } = new[]
         {
             "All", "Critical only", "High+", "Medium+"
+        };
+
+        public IReadOnlyList<string> AvailableModStatusFilters { get; } = new[]
+        {
+            "All", "Clean only", "With issues"
         };
 
         public MainWindowViewModel()
@@ -72,6 +92,8 @@ namespace ConflictScanner.ViewModels
         partial void OnSearchFilterChanged(string value) => ApplyFilter();
         partial void OnSelectedCategoryChanged(string value) => ApplyFilter();
         partial void OnSelectedMinImpactChanged(string value) => ApplyFilter();
+        partial void OnModFilterChanged(string value) => ApplyModFilter();
+        partial void OnSelectedModStatusFilterChanged(string value) => ApplyModFilter();
 
         [RelayCommand]
         private void DetectGame()
@@ -111,6 +133,13 @@ namespace ConflictScanner.ViewModels
         }
 
         [RelayCommand]
+        private void ResetModFilters()
+        {
+            ModFilter = string.Empty;
+            SelectedModStatusFilter = "All";
+        }
+
+        [RelayCommand]
         private async Task RunScanAsync()
         {
             if (IsBusy)
@@ -129,6 +158,10 @@ namespace ConflictScanner.ViewModels
             Findings.Clear();
             FilteredFindings.Clear();
             FindingsCount = 0;
+            InstalledMods.Clear();
+            FilteredInstalledMods.Clear();
+            InstalledModsCount = 0;
+            CleanModsCount = 0;
 
             _scanCts = new CancellationTokenSource();
             var token = _scanCts.Token;
@@ -164,6 +197,14 @@ namespace ConflictScanner.ViewModels
                     context.ScanDuration = DateTime.UtcNow - start;
                 }, token);
 
+                foreach (var mod in context.InstalledMods.OrderBy(m => m.Name))
+                {
+                    InstalledMods.Add(mod);
+                }
+                InstalledModsCount = InstalledMods.Count;
+                CleanModsCount = InstalledMods.Count(m => m.Status == ModHealthStatus.Clean);
+                ApplyModFilter();
+
                 foreach (var finding in context.Findings)
                 {
                     Findings.Add(finding);
@@ -173,7 +214,7 @@ namespace ConflictScanner.ViewModels
 
                 var report = ReportGenerator.Generate(context);
                 ReportText = report;
-                Status = $"Scan complete in {context.ScanDuration.TotalSeconds:F1}s. Found {FindingsCount} finding(s).";
+                Status = $"Scan complete in {context.ScanDuration.TotalSeconds:F1}s. Detected {InstalledModsCount} mod(s) ({CleanModsCount} clean), {FindingsCount} finding(s).";
 
                 GameLocator.SavePath(GamePath);
             }
@@ -226,6 +267,57 @@ namespace ConflictScanner.ViewModels
                 }
 
                 FilteredFindings.Add(finding);
+            }
+        }
+
+        private void ApplyModFilter()
+        {
+            FilteredInstalledMods.Clear();
+
+            foreach (var mod in InstalledMods)
+            {
+                // 1. Status filter
+                if (SelectedModStatusFilter == "Clean only" && mod.Status != ModHealthStatus.Clean)
+                    continue;
+                if (SelectedModStatusFilter == "With issues" && mod.Status == ModHealthStatus.Clean)
+                    continue;
+
+                // 2. Search filter
+                if (!string.IsNullOrWhiteSpace(ModFilter))
+                {
+                    bool match = mod.Name.Contains(ModFilter, StringComparison.OrdinalIgnoreCase) ||
+                                 mod.GuidOrId.Contains(ModFilter, StringComparison.OrdinalIgnoreCase) ||
+                                 mod.RelativePath.Contains(ModFilter, StringComparison.OrdinalIgnoreCase) ||
+                                 mod.AssemblyNames.Any(a => a.Contains(ModFilter, StringComparison.OrdinalIgnoreCase));
+
+                    if (!match)
+                        continue;
+                }
+
+                FilteredInstalledMods.Add(mod);
+            }
+        }
+
+        [RelayCommand]
+        public void OpenInstalledModFolder(InstalledModInfo? mod)
+        {
+            if (mod == null || string.IsNullOrWhiteSpace(mod.FolderPath))
+                return;
+
+            if (Directory.Exists(mod.FolderPath))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = mod.FolderPath,
+                        UseShellExecute = true
+                    });
+                }
+                catch
+                {
+                    // Non-critical
+                }
             }
         }
 

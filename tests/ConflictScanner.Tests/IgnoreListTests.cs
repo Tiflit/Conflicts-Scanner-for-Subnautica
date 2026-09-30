@@ -16,6 +16,10 @@ namespace ConflictScanner.Tests
         [InlineData("config.json", false)]
         [InlineData("bundle", false)]
         [InlineData("assets/sound.ogg", false)]
+        [InlineData("__folder_managed_by_vortex", true)]
+        [InlineData("SubDir/__folder_managed_by_vortex", true)]
+        [InlineData(".vortex_backup", true)]
+        [InlineData("SubDir/.vortex_backup_file", true)]
         public void ShouldIgnore_DetectsExpectedFiles(string path, bool expected)
         {
             bool ignored = IgnoreList.ShouldIgnore(path);
