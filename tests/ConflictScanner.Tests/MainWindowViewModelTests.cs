@@ -149,10 +149,9 @@ namespace ConflictScanner.Tests
             vm.InstalledMods.Add(mod1);
             vm.InstalledMods.Add(mod2);
             vm.InstalledMods.Add(mod3);
+            vm.ApplyModFilter();
 
             // Initially all 3
-            vm.ModFilter = string.Empty;
-            vm.SelectedModStatusFilter = "All";
             Assert.Equal(3, vm.FilteredInstalledMods.Count);
 
             // Filter by Clean only

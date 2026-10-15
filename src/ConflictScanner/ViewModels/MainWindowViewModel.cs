@@ -130,6 +130,7 @@ namespace ConflictScanner.ViewModels
             SearchFilter = string.Empty;
             SelectedCategory = "All";
             SelectedMinImpact = "All";
+            ApplyFilter();
         }
 
         [RelayCommand]
@@ -137,6 +138,7 @@ namespace ConflictScanner.ViewModels
         {
             ModFilter = string.Empty;
             SelectedModStatusFilter = "All";
+            ApplyModFilter();
         }
 
         [RelayCommand]
@@ -235,7 +237,7 @@ namespace ConflictScanner.ViewModels
             }
         }
 
-        private void ApplyFilter()
+        internal void ApplyFilter()
         {
             FilteredFindings.Clear();
 
@@ -270,7 +272,7 @@ namespace ConflictScanner.ViewModels
             }
         }
 
-        private void ApplyModFilter()
+        internal void ApplyModFilter()
         {
             FilteredInstalledMods.Clear();
 
