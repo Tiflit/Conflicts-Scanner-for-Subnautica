@@ -225,7 +225,7 @@
                           <TextBlock Text="{Binding RelativePath, StringFormat='Location: {0}'}"
                                      Opacity="0.7"
                                      FontSize="11"/>
-                          <TextBlock Text="{Binding FindingsCount, StringFormat='{0} issue(s) reported'}"
+                          <TextBlock Text="{Binding FindingsCount, StringFormat='{}{0} issue(s) reported'}"
                                      IsVisible="{Binding HasIssues}"
                                      FontWeight="SemiBold"
                                      Foreground="#C62828"
