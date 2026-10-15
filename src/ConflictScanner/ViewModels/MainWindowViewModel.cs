@@ -237,7 +237,7 @@ namespace ConflictScanner.ViewModels
             }
         }
 
-        internal void ApplyFilter()
+        public void ApplyFilter()
         {
             FilteredFindings.Clear();
 
@@ -272,7 +272,7 @@ namespace ConflictScanner.ViewModels
             }
         }
 
-        internal void ApplyModFilter()
+        public void ApplyModFilter()
         {
             FilteredInstalledMods.Clear();
 
